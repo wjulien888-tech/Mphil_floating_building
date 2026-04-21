@@ -1,0 +1,10 @@
+Path conventions (PDF layout / project plan)
+==============================================
+
+When implementing scripts (pv_generation.py, load_generation.py, dispatch.py, sensitivity.py):
+
+- PVGIS inputs: read from data/ (e.g. data/pvgis_south_45.csv, data/pvgis_deck.csv, and other data/pvgis_*.csv as needed).
+- Generated CSV outputs: write to output/ (e.g. pv_generation_8760.csv, load_8760.csv, results_comparison.csv, sensitivity_results.csv).
+- Figures / plots: write to plots/.
+
+Root stays for the main .py files and project docs (e.g. Cursor_workflow.pdf).
