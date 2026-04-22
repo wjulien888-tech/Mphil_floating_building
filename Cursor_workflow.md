@@ -1,7 +1,3 @@
-# 项目工作流
-
-由 `Cursor_workflow.pdf` 转换整理为 Markdown，便于直接阅读与检索。内容基于 PDF 提取文本做了格式规范化处理。
-
 ## 项目背景
 
 本项目围绕 HKUST(GZ) Waterfront Living Lab 漂浮零碳建筑，评估不同能源调度策略的表现。
