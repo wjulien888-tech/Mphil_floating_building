@@ -263,9 +263,9 @@ cooling_factor = [1.000, 1.004, 1.008, 1.012, 1.016, 1.020]
 1. 按比例缩放基础 `pv_kW`，重新计算光伏发电序列
 2. 运行 `RBC`
 3. 记录：
-   - `annual_pv_total`
-   - `self_consumption_rate`
-   - `net_cost`
+  - `annual_pv_total`
+  - `self_consumption_rate`
+  - `net_cost`
 
 ### 输出要求
 
@@ -314,4 +314,4 @@ pip install pandas numpy matplotlib pulp scipy
 SOC(t+1) = SOC(t) + charge(t) * eff / 215 - discharge(t) / (eff * 215)
 ```
 
-7. 每个脚本结束时都应打印关键校核结果。
+1. 每个脚本结束时都应打印关键校核结果。
