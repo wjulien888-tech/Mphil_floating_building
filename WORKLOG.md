@@ -305,3 +305,30 @@
 
 - `plots/pv_load_daily_compare.png`（重绘）
 - `plots/pv_load_weekly_hourly_overlay.png`（新增）
+
+## 2026-05-05 - 组会主线文档与 README 重构
+
+### 目标
+
+将项目叙事对齐组会：**浮式建筑为主体**、校园实测 PV 为**本地扰动参照**、后续重点为**储能调度与离岛韧性**；补充数据申请清单与汇报逐页稿。
+
+### 已完成内容
+
+- 重写 [README.md](README.md) 开篇与新增 **§0 研究定位与路线**（主体分工、`PV = PVGIS × F` 框架、实验矩阵摘要）
+- 新增 [research_plan.md](research_plan.md)（数据流、学习产物、E0–E5 矩阵、指标与代码顺序）
+- 新增 [data_request.md](data_request.md)（向学校申请能源中心/数据中心字段与时间粒度）
+- 新增 [deliverables/group_meeting_slides.md](deliverables/group_meeting_slides.md)（约 10 页组会逐页稿）
+- 在 [Cursor_workflow.md](Cursor_workflow.md) 文首增加指向 `research_plan.md` 与 `load_generation.py` 的说明
+- [README.md](README.md) §8 开发进度勾选上述文档交付项
+
+### 修改或新增的文件
+
+- `README.md`
+- `research_plan.md`
+- `data_request.md`
+- `deliverables/group_meeting_slides.md`
+- `Cursor_workflow.md`
+
+### 工作说明
+
+实现层脚本（`pv_local_pattern.py`、`pv_scenario_generation.py`、`dispatch.py`）仍待开发；当前交付为**研究路线与汇报材料**，便于组会统一口径与数据申请。

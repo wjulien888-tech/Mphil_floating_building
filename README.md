@@ -2,14 +2,13 @@
 
 > HKUST(GZ) Waterfront Living Lab 浮体零碳建筑 MPhil 研究项目。  
 >
-> 基于 2023 年 8760 小时 PVGIS 辐照数据 + ASHRAE 负荷日程 + 设计院资料，建立**可复现**的光伏发电、分项建筑负荷与未调度供需对比基准。  
->
-> 后续将在此基础上做储能调度（RBC / MILP / MPC）与灵敏度分析。
+> **研究主体**仍为设计院口径的水上浮式建筑；本仓库已建立 **PVGIS + 分项负荷** 的 **8760 小时未调度基准**。计划引入校园（能源中心 / 数据中心）**实测光伏**作为**南沙本地波动与经验折减**的参照，生成扰动情景后，重点开展 **储能调度（RBC / MILP / MPC）** 与 **极端天气离岛韧性** 分析。神经网络仅在独立「PV prediction」子课题中作为核心方法；本仓库主线以**情景生成 + 调度**为主。
 
 ---
 
 ## 目录
 
+- [0. 研究定位与路线（组会主线）](#0-研究定位与路线组会主线)
 - [1. 研究背景与目标](#1-研究背景与目标)
 - [2. 项目结构](#2-项目结构)
 - [3. 使用方法](#3-使用方法)
@@ -23,6 +22,45 @@
 - [8. 开发进度](#8-开发进度)
 - [9. Git 与版本控制](#9-git-与版本控制)
 - [10. 参考](#10-参考)
+
+---
+
+## 0. 研究定位与路线（组会主线）
+
+### 0.1 主体与数据分工
+
+| 角色 | 内容 |
+|------|------|
+| **研究案例** | 设计院水上浮式建筑：几何、BIPV 分区、储能参数、年负荷口径等 |
+| **基准光伏** | `pv_generation.py`：PVGIS ERA5 + 物理公式 + 水面微气候系数 → `output/pv_generation_8760.csv` |
+| **基准负荷** | `load_generation.py`：分项模型 + 设计院年电量校准 → `output/load_8760.csv` |
+| **校园实测 PV** | 能源中心 / 数据中心：**不替代浮式建筑真值**，用于提取南沙本地 **归一化出力**、**经验扰动因子**、**典型日 / 极端低发电事件** |
+| **后续核心** | 储能调度、购售电与 SOC；**离岛模式**下关键负荷与续航；水面微气候 **灵敏度** |
+
+### 0.2 校园数据如何接入（逻辑）
+
+不直接把能源楼发电量当作浮式建筑发电量，推荐统一写成：
+
+```text
+PV_floating_scenario(t) = PV_floating_PVGIS(t) × F(t)
+```
+
+其中 `PV_floating_PVGIS(t)` 仍由浮式建筑面积、朝向、效率与本项目 `pv_generation.py` 生成；`F(t)` 为从校园实测学习或统计得到的 **经验修正因子**（含天气波动、系统损耗、限发等，不限于纯气象）。亦可对比更简单基线：`F(t)=1`（baseline）、按日类型聚合的 `F`、或另一项目中的神经网络预测 `F`。
+
+详细流程、产物命名与实验矩阵见 **[research_plan.md](research_plan.md)**。向学校申请数据时的字段清单见 **[data_request.md](data_request.md)**。组会汇报用逐页稿见 **[deliverables/group_meeting_slides.md](deliverables/group_meeting_slides.md)**。
+
+### 0.3 实验矩阵（摘要）
+
+| 编号 | 名称 | PV 输入 | 负荷 | 电网 / 离岛 | 目的 |
+|------|------|---------|------|-------------|------|
+| E0 | Baseline | PVGIS 浮式物理模型 | 当前 `load_8760.csv` | 未调度 | 已复现；看年盈余与逐时缺口 |
+| E1 | 本地扰动 | Baseline × `F`（来自校园统计或学习） | 同 E0 | 未调度 | 检验真实波动对匹配度的影响 |
+| E2 | 极端天气 | 连续低 PV / 台风周等合成或历史片段 | 同 E0 | 部分时段离岛 | 压力测试 |
+| E3 | RBC 调度 | E0 或 E1 | 同 E0 | 并网 + 可选离岛 | 工程可解释基线 |
+| E4 | MILP | E0 或 E1 | 同 E0 | 并网 + 可选离岛 | 理论最优参照 |
+| E5 | MPC | E0 或 E1 | 同 E0 | 并网 + 可选离岛 | 滚动、更接近运行 |
+
+完整指标与实现顺序见 [research_plan.md](research_plan.md) 第 4 节。
 
 ---
 
@@ -41,7 +79,7 @@
 
 > 在 **2023 年** 的 PVGIS 辐照与**设计院口径负荷**下，在**未接入储能调度**的情况下，光伏与负荷在 **逐日 / 逐时** 上是否匹配？缺口主要出现在何时何处？
 
-后续再加入储能与调度策略对比、灵敏度分析。
+在基准之上，本研究还将回答：**在给定本地 PV 情景与电池约束下，何种调度策略能在并网与离岛条件下降低购电、控制缺电并应对极端天气？**（实现见规划中的 `dispatch.py` 等。）
 
 ---
 
@@ -75,8 +113,12 @@ g:\0000Mphil_floating_building\
 ├── load_generation.py                     分项负荷脚本
 ├── pv_load_daily_compare.py               未调度供需对比脚本
 ├── requirements.txt                       Python 依赖
+├── research_plan.md                       研究路线：baseline、校园 PV、情景、调度与离岛
+├── data_request.md                        向学校申请能源中心/数据中心数据字段说明
 ├── Cursor_workflow.md                     PDF 研究任务的中文版说明
 ├── Cursor_workflow.pdf                    原始研究任务 PDF
+├── deliverables/
+│   └── group_meeting_slides.md            组会汇报逐页稿（8–10 页）
 ├── WORKLOG.md                             中文工作日志（每次改动都会追加）
 └── path_convention_note.txt               路径约定备忘
 ```
@@ -339,6 +381,7 @@ Days with PV > load: 312 | Days with PV < load: 53
 - [x] 节假日与调休处理（`holidays` + 国务院官方表）
 - [x] 未调度 PV-负荷对比（日级 + 小时级周叠加）
 - [x] 工作日志机制（`WORKLOG.md`）
+- [x] 研究路线文档（`research_plan.md`）、数据申请说明（`data_request.md`）、组会逐页稿（`deliverables/group_meeting_slides.md`）
 - [ ] 储能系统规则控制调度（`dispatch.py` - RBC）
 - [ ] 储能系统 MILP 最优调度（`dispatch.py` - MILP）
 - [ ] 储能系统 MPC 滚动调度（`dispatch.py` - MPC）
@@ -378,6 +421,9 @@ git push
 
 ## 10. 参考
 
+- **研究路线与实验矩阵**：[research_plan.md](research_plan.md)
+- **数据申请清单**：[data_request.md](data_request.md)
+- **组会汇报稿**：[deliverables/group_meeting_slides.md](deliverables/group_meeting_slides.md)
 - **PDF 任务书**：`Cursor_workflow.pdf`（中文整理版 `Cursor_workflow.md`）
 - **气象数据**：[PVGIS - JRC European Commission](https://joint-research-centre.ec.europa.eu/pvgis-photovoltaic-geographical-information-system_en)
 - **负荷日程系数**：ASHRAE 90.1 Energy Standard（PDF 中给出具体数值）
