@@ -332,3 +332,29 @@
 ### 工作说明
 
 实现层脚本（`pv_local_pattern.py`、`pv_scenario_generation.py`、`dispatch.py`）仍待开发；当前交付为**研究路线与汇报材料**，便于组会统一口径与数据申请。
+
+## 2026-05-05 - 组会口径二次收敛（去除神经网络/校园叙事）
+
+### 目标
+
+按组会准备需求，将文档叙事收敛为：只并列说明**光伏出力来源**与**负荷来源**，并聚焦后续调度与离岛工作。
+
+### 已完成内容
+
+- 调整 `README.md` 开篇与第 0 节，移除神经网络与校园实测的主线描述
+- 重写 `research_plan.md`，改为数据来源、实验矩阵、实施顺序三段式
+- 重写 `deliverables/group_meeting_slides.md`，将汇报结构改为「数据来源 -> 基准结果 -> 调度与离岛」
+- 更新 `Cursor_workflow.md` 文首提示语，删除校园/F 因子表述
+- 重写 `data_request.md` 为「数据来源说明（光伏与负荷）」
+
+### 修改的文件
+
+- `README.md`
+- `research_plan.md`
+- `deliverables/group_meeting_slides.md`
+- `Cursor_workflow.md`
+- `data_request.md`
+
+### 工作说明
+
+该版本可直接用于组会展示：不引入新数据路线讨论，先把当前可复现链路和后续调度工作讲清楚。
