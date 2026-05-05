@@ -1,4 +1,4 @@
-> **研究路线与最新主线**（组会汇报版）：聚焦本项目既有数据来源（PVGIS 光伏 + 设计院负荷口径）与后续调度/离岛分析；详见仓库根目录 **[research_plan.md](research_plan.md)**。  
+> **研究路线与最新主线**（组会汇报版）：以 PVGIS 光伏 + 设计院负荷口径建立基准；若能源中心 / 数据中心实测 PV 获批，则提取扰动系数合成光伏情景；后续聚焦调度/离岛分析。详见仓库根目录 **[research_plan.md](research_plan.md)**。  
 > **任务 2 负荷建模**：本 PDF 整理稿中的单列公式为早期版本——**以当前 `load_generation.py` 分项模型为准**。
 
 ## 项目背景
@@ -89,6 +89,51 @@ corrected_power = power * albedo_factor * cooling_factor
 - 列名为：`datetime`、`pv_kW`
 - 输出全年总发电量，并与设计值 `55,580 kWh` 比较
 - 绘制日尺度和月尺度发电图用于校核
+
+## 任务 1b：实测 PV 扰动系数与情景光伏曲线（后续扩展）
+
+目标脚本建议：`pv_scenario_generation.py`
+
+该步骤属于光伏出力数据工作的一部分，不替代任务 1 的 PVGIS 基准，而是在拿到能源中心 / 数据中心实测光伏数据后，用实测曲线提取南沙本地扰动系数，并作用到浮式建筑 PVGIS 基准曲线上。
+
+### 输入文件
+
+- `output/pv_generation_8760.csv`：任务 1 生成的浮式建筑 PVGIS 基准光伏曲线
+- 能源中心 / 数据中心实测 PV 数据（若获批）：
+  - `timestamp`
+  - `pv_power_kw`
+  - `installed_capacity_kwp`
+  - 可选：限发 / 故障标记、阵列倾角与方位角
+
+### 扰动系数构造
+
+先将实测 PV 归一化：
+
+```text
+normalized_pv(t) = measured_pv_kw(t) / installed_capacity_kwp
+```
+
+若有同站点 PVGIS 或理论参考曲线，可进一步构造：
+
+```text
+disturbance_factor(t) = measured_pv_kw(t) / reference_pv_kw(t)
+```
+
+使用时需要避免夜间或参考值接近 0 的除法问题，并对明显异常值进行筛除或截断。
+
+### 情景光伏曲线
+
+将扰动系数作用于浮式建筑 PVGIS 基准：
+
+```text
+pv_scenario_kw(t) = pv_generation_8760.pv_kW(t) * disturbance_factor(t)
+```
+
+### 输出要求
+
+- 保存为 `output/pv_generation_8760_scenario_*.csv`
+- 至少包含：`datetime`、`pv_kW_baseline`、`disturbance_factor`、`pv_kW_scenario`
+- 生成情景前后对比图，用于后续未调度对比与 `dispatch.py`
 
 ## 任务 2：生成建筑负荷曲线
 
@@ -232,13 +277,15 @@ else:
 ### 孤岛工况
 
 - 孤岛负荷定义为 `13 kW`
-- 在某个典型日的第 0 小时电网断开
+- 在指定事件窗口的第 0 小时电网断开
 - 对每种策略，计算电池跌破最低 SOC 前可维持的时长
-- 测试三类典型日：
-  - 最优日
-  - 最差日
-  - 平均日
-- 从 `pv_generation_8760.csv` 的逐日总发电量中选取这些天
+- 全年基准仍使用 `pv_generation_8760.csv`；极端天气不设为整年，而是从能源中心 / 数据中心实测 PV 提取真实低出力事件窗口
+- 建议测试尺度：
+  - `24 h`：单日暴雨 / 强阴天低 PV
+  - `48 h`：连续两天低辐照
+  - `72 h`：连续三天台风 / 暴雨
+  - `7 d`：连续低出力周（可选压力测试）
+- 事件窗口由实测 PV 中最低 `24 h` / `48 h` / `72 h` / 可选 `7 d` 低出力片段生成，并转为扰动系数后输出 `pv_generation_8760_extreme_*.csv`
 
 ### 输出要求
 
@@ -318,3 +365,4 @@ SOC(t+1) = SOC(t) + charge(t) * eff / 215 - discharge(t) / (eff * 215)
 ```
 
 1. 每个脚本结束时都应打印关键校核结果。
+
