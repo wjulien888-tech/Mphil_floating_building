@@ -1,7 +1,9 @@
 # MPhil Floating Building — 水上零碳建筑光伏 / 负荷 / 能量对比分析
 
 > HKUST(GZ) Waterfront Living Lab 浮体零碳建筑 MPhil 研究项目。  
+>
 > 基于 2023 年 8760 小时 PVGIS 辐照数据 + ASHRAE 负荷日程 + 设计院资料，建立**可复现**的光伏发电、分项建筑负荷与未调度供需对比基准。  
+>
 > 后续将在此基础上做储能调度（RBC / MILP / MPC）与灵敏度分析。
 
 ---
