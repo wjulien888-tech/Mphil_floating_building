@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="500" viewBox="0 0 1200 500">
+  <rect width="1200" height="500" fill="#ffffff"/>
+  <text x="600" y="28" text-anchor="middle" font-family="Arial" font-size="18" fill="#1f2933">Monthly grid import, VPP export and net electricity cost</text>
+  <text x="22" y="250" transform="rotate(-90 22 250)" text-anchor="middle" font-family="Arial" font-size="12" fill="#52606d">Energy (kWh)</text>
+  <line x1="84" y1="442" x2="1156" y2="442" stroke="#9aa5b1"/>
+  <line x1="84" y1="58" x2="84" y2="442" stroke="#9aa5b1"/>
+  <line x1="84" y1="442" x2="1156" y2="442" stroke="#e4e7eb"/><text x="76" y="446" text-anchor="end" font-family="Arial" font-size="10" fill="#52606d">0</text><line x1="84" y1="250" x2="1156" y2="250" stroke="#e4e7eb"/><text x="76" y="254" text-anchor="end" font-family="Arial" font-size="10" fill="#52606d">2767</text><line x1="84" y1="58" x2="1156" y2="58" stroke="#e4e7eb"/><text x="76" y="62" text-anchor="end" font-family="Arial" font-size="10" fill="#52606d">5535</text>
+      <rect x="106.66666666666666" y="431.4942146504239" width="20" height="10.505785349576115" fill="#334e68" opacity="0.85"/>
+      <rect x="130.66666666666666" y="214.1983126964057" width="20" height="227.8016873035943" fill="#d99000" opacity="0.78"/>
+    
+      <rect x="196" y="442" width="20" height="0" fill="#334e68" opacity="0.85"/>
+      <rect x="220" y="146.3666238150442" width="20" height="295.6333761849558" fill="#d99000" opacity="0.78"/>
+    
+      <rect x="285.33333333333337" y="427.9935115819563" width="20" height="14.006488418043716" fill="#334e68" opacity="0.85"/>
+      <rect x="309.33333333333337" y="141.14867939161678" width="20" height="300.8513206083832" fill="#d99000" opacity="0.78"/>
+    
+      <rect x="374.6666666666667" y="379.90674829552734" width="20" height="62.093251704472664" fill="#334e68" opacity="0.85"/>
+      <rect x="398.6666666666667" y="311.16151925323675" width="20" height="130.83848074676325" fill="#d99000" opacity="0.78"/>
+    
+      <rect x="464" y="397.4909375832332" width="20" height="44.509062416766824" fill="#334e68" opacity="0.85"/>
+      <rect x="488" y="360.3493355742561" width="20" height="81.65066442574391" fill="#d99000" opacity="0.78"/>
+    
+      <rect x="553.3333333333333" y="325.88736129094076" width="20" height="116.11263870905924" fill="#334e68" opacity="0.85"/>
+      <rect x="577.3333333333333" y="425.6377572674359" width="20" height="16.362242732564084" fill="#d99000" opacity="0.78"/>
+    
+      <rect x="642.6666666666666" y="326.0542320973457" width="20" height="115.94576790265432" fill="#334e68" opacity="0.85"/>
+      <rect x="666.6666666666666" y="401.9732057917264" width="20" height="40.0267942082736" fill="#d99000" opacity="0.78"/>
+    
+      <rect x="732" y="226.73529930277238" width="20" height="215.26470069722762" fill="#334e68" opacity="0.85"/>
+      <rect x="756" y="436.2125671935224" width="20" height="5.787432806477625" fill="#d99000" opacity="0.78"/>
+    
+      <rect x="821.3333333333334" y="284.0595883581868" width="20" height="157.94041164181323" fill="#334e68" opacity="0.85"/>
+      <rect x="845.3333333333334" y="430.94994820506645" width="20" height="11.050051794933552" fill="#d99000" opacity="0.78"/>
+    
+      <rect x="910.6666666666666" y="406.0112613289469" width="20" height="35.98873867105311" fill="#334e68" opacity="0.85"/>
+      <rect x="934.6666666666666" y="386.2744606004473" width="20" height="55.7255393995527" fill="#d99000" opacity="0.78"/>
+    
+      <rect x="1000" y="442" width="20" height="0" fill="#334e68" opacity="0.85"/>
+      <rect x="1024" y="108.08695652173913" width="20" height="333.9130434782609" fill="#d99000" opacity="0.78"/>
+    
+      <rect x="1089.3333333333335" y="442" width="20" height="0" fill="#334e68" opacity="0.85"/>
+      <rect x="1113.3333333333335" y="232.72055456770607" width="20" height="209.27944543229393" fill="#d99000" opacity="0.78"/>
+    <polyline points="128.66666666666666,387.2355880901532 218,425.7753316878626 307.33333333333337,414.5164874164305 396.6666666666667,301.05004877932697 486,293.86284288744133 575.3333333333333,206.2778526513339 664.6666666666666,215.3866902991258 754,92.07981630658941 843.3333333333334,150.2200688324288 932.6666666666666,288.33867452152367 1022,442 1111.3333333333335,389.17459863613453" fill="none" stroke="#c44e52" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><text x="128.66666666666666" y="472" text-anchor="middle" font-family="Arial" font-size="10" fill="#52606d">1</text><text x="218" y="472" text-anchor="middle" font-family="Arial" font-size="10" fill="#52606d">2</text><text x="307.33333333333337" y="472" text-anchor="middle" font-family="Arial" font-size="10" fill="#52606d">3</text><text x="396.6666666666667" y="472" text-anchor="middle" font-family="Arial" font-size="10" fill="#52606d">4</text><text x="486" y="472" text-anchor="middle" font-family="Arial" font-size="10" fill="#52606d">5</text><text x="575.3333333333333" y="472" text-anchor="middle" font-family="Arial" font-size="10" fill="#52606d">6</text><text x="664.6666666666666" y="472" text-anchor="middle" font-family="Arial" font-size="10" fill="#52606d">7</text><text x="754" y="472" text-anchor="middle" font-family="Arial" font-size="10" fill="#52606d">8</text><text x="843.3333333333334" y="472" text-anchor="middle" font-family="Arial" font-size="10" fill="#52606d">9</text><text x="932.6666666666666" y="472" text-anchor="middle" font-family="Arial" font-size="10" fill="#52606d">10</text><text x="1022" y="472" text-anchor="middle" font-family="Arial" font-size="10" fill="#52606d">11</text><text x="1111.3333333333335" y="472" text-anchor="middle" font-family="Arial" font-size="10" fill="#52606d">12</text><text x="84" y="44" font-family="Arial" font-size="12" fill="#334e68">Grid import kWh</text><text x="204" y="44" font-family="Arial" font-size="12" fill="#d99000">VPP export kWh</text><text x="329" y="44" font-family="Arial" font-size="12" fill="#c44e52">Net cost CNY</text></svg>
