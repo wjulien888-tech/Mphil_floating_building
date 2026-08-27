@@ -6,6 +6,11 @@ __pycache__/
 .Python
 *.egg-info/
 .eggs/
+.venv/
+
+# Read-only upstream checkouts. Project changes live in the vendored *-hkust copies.
+/external/ol-ems/
+/external/python-microgrid/
 
 # IDE
 .idea/

@@ -3,3 +3,7 @@
 *.png binary
 *.pptx binary
 *.pdf binary
+
+# Preserve upstream snapshots byte-for-byte; project edits still receive normal text diffs.
+/external/ol-ems-hkust/** -text
+/external/python-microgrid-hkust/** -text

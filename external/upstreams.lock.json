@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "tracking_strategy": "vendored_snapshot",
+  "repositories": [
+    {
+      "name": "ol-ems",
+      "source_url": "https://github.com/vittpi/ol-ems.git",
+      "source_commit": "3b7b5c305f940f7d732efdae082428e61000965b",
+      "license": "MIT",
+      "reference_checkout": "external/ol-ems",
+      "vendored_path": "external/ol-ems-hkust"
+    },
+    {
+      "name": "python-microgrid",
+      "source_url": "https://github.com/ahalev/python-microgrid.git",
+      "source_commit": "09089ccfaab3e95becfda1b26fbce6f9c6195f6a",
+      "license": "LGPL-3.0",
+      "reference_checkout": "external/python-microgrid",
+      "vendored_path": "external/python-microgrid-hkust"
+    }
+  ]
+}
