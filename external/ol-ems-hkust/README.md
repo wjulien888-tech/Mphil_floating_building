@@ -1,5 +1,32 @@
 # Learning-based Model Predictive Control for Microgrid Energy Management
 
+## HKUST M0 entry point (2026-09-21)
+
+The local `main.py` now trains/evaluates the two-layer LSTM or GRU with the frozen
+2021–2023 constructed PV dataset: 96 historical quarter-hour PV values predict
+the next quarter-hour. The default model is LSTM (2 × 64, dropout 0.2); select
+GRU with `--model_type gru`. Both share the training-only scaler, validation
+selection and independent test evaluation. Existing two-layer checkpoints load
+without conversion. Commands below run from the parent project's root:
+
+```bash
+external/ol-ems-hkust/.venv/bin/python external/ol-ems-hkust/main.py --mode train --model_type lstm
+external/ol-ems-hkust/.venv/bin/python external/ol-ems-hkust/main.py --mode train --model_type gru
+external/ol-ems-hkust/.venv/bin/python tools/run_formal_m0.py --output experiments/new_m0_run
+```
+
+The suite runs both models with seed 42, reloads their best checkpoints for full
+validation/test evaluation, and reports R², RMSE, MAE, MBE and both persistence
+baselines. See [model settings and evaluation commands](../../model_variants/README.md)
+and [Python environment](ENVIRONMENT.md). Raw/frozen data and trained weights
+are local artifacts and are not bundled in this code commit.
+
+`--mode closed-loop` explicitly retains the historical multi-step MPC interface.
+It rejects the new one-step checkpoints; the old single-layer controller is
+retained for historical MPC compatibility and is no longer the M0 forecast
+default. The upstream paper and its original usage notes below describe the
+vendored source, not this revised M0 protocol.
+
 by Vittorio Casagrande (vittorio.casagrande.19@ucl.ac.uk), Martin Ferianc, Miguel Rodrigues and Francesca Boem
 
 This repository contains the code used for the paper "An Online Learning Method for Microgrid Energy Management Control" presented at the 31st Mediterranean Conference on Control and Automation (MED 2023) in Limassol, Cyprus. 

@@ -1,0 +1,55 @@
+{
+  "change": "Official M0 entry selects the existing two-layer LSTM/GRU without converting checkpoints.",
+  "task": {
+    "history_features": [
+      "pv"
+    ],
+    "lookback_steps": 96,
+    "horizon_steps": 1,
+    "frequency": "15min"
+  },
+  "workspace_pytest": "61 passed",
+  "source_experiment": "experiments/pvonly_lstm_gru_96to1_20260920_230516",
+  "verification_artifacts": "tmp/m0_entry_integration_20260921_171130",
+  "models": {
+    "lstm": {
+      "full_test_samples": 5852,
+      "all_prediction_columns_exactly_equal": true,
+      "checkpoint_unchanged": true,
+      "checkpoint_sha256": "6a95a40e1fd76799d98da5526e8f8174f24cef5a3de04ba4e8cb9745dbd4e8d1",
+      "test_metrics": {
+        "method": "M0",
+        "period": "all",
+        "count": 5852,
+        "mae_kw": 0.8855184751138809,
+        "rmse_kw": 1.9673394061561258,
+        "mbe_kw": 0.03996092424284277,
+        "mse_kw2": 3.870424339014738,
+        "r2": 0.9772399664126801
+      },
+      "new_entry_smoke_training": "passed; one batch only"
+    },
+    "gru": {
+      "full_test_samples": 5852,
+      "all_prediction_columns_exactly_equal": true,
+      "checkpoint_unchanged": true,
+      "checkpoint_sha256": "79f14cdd553f417e60bdbb8822537d37750ef1b8beeca2843a373221f99a6015",
+      "test_metrics": {
+        "method": "M0",
+        "period": "all",
+        "count": 5852,
+        "mae_kw": 0.9816918855751671,
+        "rmse_kw": 2.079195049772255,
+        "mbe_kw": -0.02020413031205102,
+        "mse_kw2": 4.32305205499745,
+        "r2": 0.9745782887473984
+      },
+      "new_entry_smoke_training": "passed; one batch only"
+    }
+  },
+  "git_index_export_pytest": {
+    "passed": 50,
+    "skipped": 1,
+    "skip_reason": "Historical frozen dataset is a local artifact, absent in the isolated staged-code export."
+  }
+}
