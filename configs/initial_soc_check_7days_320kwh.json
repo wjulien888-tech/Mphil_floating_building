@@ -1,0 +1,40 @@
+{
+  "protocol_version": "m0-scenarios-v2",
+  "start": "2023-11-01 00:00:00",
+  "days": 7,
+  "purpose": "Initialization sensitivity only: same frozen M0, data, 50kW/320kWh battery and controller; no outage, no training.",
+  "cases": [
+    {
+      "name": "S0_initial_soc20",
+      "group": "S0",
+      "initial_soc": 0.2
+    },
+    {
+      "name": "S0_initial_soc50",
+      "group": "S0",
+      "initial_soc": 0.5
+    },
+    {
+      "name": "S0_initial_soc80",
+      "group": "S0",
+      "initial_soc": 0.8
+    }
+  ],
+  "s5_grid": {
+    "initial_soc": [],
+    "rho": [
+      1.0
+    ],
+    "event_hour": [
+      228.0
+    ],
+    "outage_hours": [
+      24
+    ],
+    "warning_hours": 24,
+    "pv_regime": [
+      "original"
+    ]
+  },
+  "interpretation": "Seven-day initialization convergence check, not annual outage robustness or a 24-hour backup guarantee. Extend if trajectories have not converged."
+}

@@ -1,6 +1,7 @@
-"""双层 LSTM M0 副本：过去96个15分钟PV点 → 下一个15分钟PV点。
+"""双层 LSTM M0：可配置历史PV窗口 → 直接多步PV预测。
 
-移植参考 LSTM 脚本的两层64维循环网络、0.2层间dropout和64→5→1输出头。
+两层64维循环网络、0.2层间dropout；旧默认64→5→1输出头保持兼容。
+未来24小时配置使用96/192/288步历史、64→64→96输出头。
 沿用本项目15分钟/kW数据、验证集选模、best/last及独立测试协议。
 默认读取2021—2023年PV-only冻结数据；本脚本不生成标签，也不使用气象输入。
 """
@@ -20,7 +21,7 @@ from src.models.controller import Controller as OriginalController
 
 
 class PVLSTMController(OriginalController):
-    """双层循环网络与单步PV预测头；训练窗口由96→1加载器限定。"""
+    """双层循环网络，预测头一次性输出全部未来时间步。"""
 
     recurrent_type = "LSTM"
 

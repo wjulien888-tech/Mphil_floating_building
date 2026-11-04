@@ -1,0 +1,46 @@
+{
+  "smoke_directory": "/Users/julia/Transfer/0000Mphil_floating_building/tmp/m0_recurrent_smoke_lucuka03",
+  "checks": [
+    {
+      "model": "lstm",
+      "parameters": 52357,
+      "architecture": {
+        "architecture_id": "hkust_m0_lstm_mlp_v1",
+        "recurrent_type": "LSTM",
+        "hidden_dim": 64,
+        "num_layers": 2,
+        "input_dim": 5,
+        "dropout": 0.2,
+        "fc_hidden_size": 5,
+        "prediction_horizon": 96,
+        "output_activation": "sigmoid_train_pv_range"
+      },
+      "training_status": "smoke_trained",
+      "epochs": 1,
+      "test_used_in_training": false,
+      "validation_origins": 8,
+      "closed_loop_steps": 2
+    },
+    {
+      "model": "gru",
+      "parameters": 39493,
+      "architecture": {
+        "architecture_id": "hkust_m0_gru_mlp_v1",
+        "recurrent_type": "GRU",
+        "hidden_dim": 64,
+        "num_layers": 2,
+        "input_dim": 5,
+        "dropout": 0.2,
+        "fc_hidden_size": 5,
+        "prediction_horizon": 96,
+        "output_activation": "sigmoid_train_pv_range"
+      },
+      "training_status": "smoke_trained",
+      "epochs": 1,
+      "test_used_in_training": false,
+      "validation_origins": 8,
+      "closed_loop_steps": 2
+    }
+  ],
+  "formal_training_started": false
+}

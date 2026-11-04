@@ -116,7 +116,10 @@ def _forecast_view(dataset: Any) -> Any:
 
 
 def _epoch(controller: torch.nn.Module, loader: DataLoader, device: torch.device,
-           count: int, optimizer: torch.optim.Optimizer | None) -> tuple[float, int]:
+           count: int, optimizer: torch.optim.Optimizer | None, *,
+           log_every_batches: int = 0, progress_label: str = "") -> tuple[float, int]:
+    if log_every_batches < 0:
+        raise ValueError("log_every_batches must be non-negative")
     controller.train(optimizer is not None)
     squared_error, elements, samples = 0.0, 0, 0
     with torch.set_grad_enabled(optimizer is not None):
@@ -128,6 +131,8 @@ def _epoch(controller: torch.nn.Module, loader: DataLoader, device: torch.device
             if optimizer is not None:
                 optimizer.zero_grad(set_to_none=True)
             forecast = controller.forecast_pv(history)
+            if forecast.shape != target.shape:
+                raise ValueError(f"Forecast and target shapes differ: {forecast.shape} != {target.shape}")
             loss = F.mse_loss(forecast, target)
             if not torch.isfinite(loss):
                 raise FloatingPointError("Non-finite M0 loss; previous last.pt is intact")
@@ -140,6 +145,12 @@ def _epoch(controller: torch.nn.Module, loader: DataLoader, device: torch.device
             squared_error += float((forecast.detach().double() - target.double()).square().sum())
             elements += target.numel()
             samples += history.shape[0]
+            completed = index + 1
+            if log_every_batches and (completed == 1 or completed % log_every_batches == 0
+                                      or completed == min(count, len(loader))):
+                LOGGER.info("%s batch %d/%d | cumulative MSE %.6f kW^2 | samples %d",
+                            progress_label or ("train" if optimizer is not None else "val"),
+                            completed, min(count, len(loader)), squared_error / elements, samples)
     if elements == 0:
         raise ValueError("Empty training/validation loader")
     return squared_error / elements, samples
@@ -157,6 +168,9 @@ def train_m0(controller: torch.nn.Module, train_dataset: Any, val_dataset: Any,
         raise ValueError("Batch sizes must be positive")
     if args.num_workers != 0:
         raise ValueError("Exact epoch-boundary resume currently requires --num_workers 0")
+    log_every_batches = getattr(args, "log_every_batches", 0)
+    if log_every_batches < 0:
+        raise ValueError("log_every_batches must be non-negative")
     device = torch.device(args.device)
     controller.to(device)
     optimizer = torch.optim.Adam(controller.parameters(), lr=args.learning_rate,
@@ -181,9 +195,22 @@ def train_m0(controller: torch.nn.Module, train_dataset: Any, val_dataset: Any,
                       "config": checkpoint_metadata["config"],
                       "model_architecture": checkpoint_metadata["model_architecture"],
                       "runtime": runtime_versions()})
+    if getattr(args, "warm_start_baseline", False):
+        signature["warm_start_baseline"] = True
     rows: list[dict[str, Any]] = []
     best_snapshot: dict[str, Any] | None = None
     best_loss, significant_best, best_epoch, bad_epochs, first_epoch = math.inf, math.inf, 0, 0, 1
+    if getattr(args, "warm_start_baseline", False) and not args.resume:
+        # A monthly update may retain the incoming model if no candidate improves
+        # on it on this month's historical validation window (never test data).
+        best_loss, _ = _epoch(controller, val_loader, device, val_count, None)
+        significant_best = best_loss
+        best_snapshot = {**checkpoint_metadata, "format_version": 2, "model_kind": "M0",
+                         "controller_state_dict": {key: value.detach().cpu().clone()
+                                                   for key, value in controller.state_dict().items()},
+                         "epoch": 0, "val_loss_mse": best_loss, "best_epoch": 0,
+                         "best_val_loss_mse": best_loss, "selection_metric": "val_loss_mse"}
+        atomic_save(output_dir / "best.pt", best_snapshot)
     if args.resume:
         previous = load_checkpoint(args.resume)
         if previous.get("training_signature") != signature:
@@ -217,12 +244,18 @@ def train_m0(controller: torch.nn.Module, train_dataset: Any, val_dataset: Any,
                 "best_selection": "strict minimum val_loss_mse; min_delta affects patience only",
                 "scheduler": "none; fixed Adam learning rate", "test_evaluated": False,
                 "train_samples_available": len(train_dataset), "val_samples_available": len(val_dataset)}
+    if getattr(args, "warm_start_baseline", False) and not args.resume:
+        metadata["incoming_validation_mse"] = best_loss
     json_write(output_dir / "run_metadata.json", metadata)
     started = time.perf_counter()
     for epoch in range(first_epoch, max_epochs + 1):
         epoch_started = time.perf_counter()
-        train_loss, train_samples = _epoch(controller, train_loader, device, train_count, optimizer)
-        val_loss, val_samples = _epoch(controller, val_loader, device, val_count, None)
+        train_loss, train_samples = _epoch(
+            controller, train_loader, device, train_count, optimizer,
+            log_every_batches=log_every_batches, progress_label=f"Epoch {epoch}/{max_epochs} train")
+        val_loss, val_samples = _epoch(
+            controller, val_loader, device, val_count, None,
+            log_every_batches=log_every_batches, progress_label=f"Epoch {epoch}/{max_epochs} val")
         is_best = val_loss < best_loss
         if is_best:
             best_loss, best_epoch = val_loss, epoch

@@ -1,0 +1,57 @@
+{
+  "task": "96 quarter-hour history steps predict the next quarter-hour PV value",
+  "smoke_directory": "/Users/julia/Transfer/0000Mphil_floating_building/tmp/m0_96to1_smoke_fvg4dq95",
+  "tests": "15 passed in tests/test_m0_recurrent_variants.py",
+  "checks": [
+    {
+      "model": "lstm",
+      "parameters": 51787,
+      "lookback_steps": 96,
+      "horizon_steps": 1,
+      "features": [
+        "pv",
+        "temperature",
+        "relative_humidity",
+        "irradiance",
+        "rainfall"
+      ],
+      "available_split_samples": {
+        "train": 23129,
+        "val": 5362,
+        "test": 5852
+      },
+      "training_status": "smoke_trained",
+      "epochs": 1,
+      "test_used_in_training": false,
+      "validation_origins": 256,
+      "prediction_rows": 256,
+      "baseline_timestamp_checks": "passed"
+    },
+    {
+      "model": "gru",
+      "parameters": 38923,
+      "lookback_steps": 96,
+      "horizon_steps": 1,
+      "features": [
+        "pv",
+        "temperature",
+        "relative_humidity",
+        "irradiance",
+        "rainfall"
+      ],
+      "available_split_samples": {
+        "train": 23129,
+        "val": 5362,
+        "test": 5852
+      },
+      "training_status": "smoke_trained",
+      "epochs": 1,
+      "test_used_in_training": false,
+      "validation_origins": 256,
+      "prediction_rows": 256,
+      "baseline_timestamp_checks": "passed"
+    }
+  ],
+  "formal_training_started": false,
+  "old_mpc_entrypoint_modified": false
+}

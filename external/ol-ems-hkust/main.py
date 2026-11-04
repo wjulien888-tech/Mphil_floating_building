@@ -232,6 +232,7 @@ def _build_adapter(config: HKUSTConfig) -> PymgridAdapter:
         soc_max=config.max_soc_fraction,
         grid_import_limit_kw=config.grid_import_limit_kW,
         grid_export_limit_kw=config.grid_export_limit_kW,
+        allow_grid_charging=config.allow_grid_charging,
         battery_cost_per_kwh=config.objective_weights["battery_cycle"],
         loss_load_cost_per_kwh=config.objective_weights["noncritical_unmet"],
         critical_loss_load_cost_per_kwh=config.objective_weights["critical_unmet"],
@@ -551,13 +552,14 @@ def build_legacy_parser() -> argparse.ArgumentParser:
 def build_parser() -> argparse.ArgumentParser:
     """The public M0 forecast interface always defaults to the new models."""
     parser = _variant_runner.build_parser("LSTM")
-    parser.description = "M0: two-layer LSTM/GRU, 96 historical PV points to the next 15-minute PV"
+    parser.description = "M0: two-layer LSTM/GRU, configurable PV history and forecast horizon (15-minute steps)"
     parser.add_argument("--model_type", "--model", choices=("lstm", "gru"), default="lstm",
                         help="PV forecaster (default: two-layer LSTM).")
     # Resolve after model selection so a GRU invocation cannot write under LSTM.
     parser.set_defaults(save_dir=None)
-    parser.epilog = ("Historical multi-step MPC remains available through --mode closed-loop. "
-                     "It requires the old multi-step checkpoint, not a 96-to-1 model.")
+    parser.epilog = ("Historical MPC remains available through --mode closed-loop. "
+                     "New PV-only forecast checkpoints require a separate MPC integration; "
+                     "a 96-step output alone does not make them compatible with the legacy controller.")
     return parser
 
 
@@ -572,7 +574,8 @@ def main(args: argparse.Namespace) -> Path:
     model_type = args.model_type
     args.recurrent_type = model_type.upper()
     if args.save_dir is None:
-        args.save_dir = str(PROJECT_ROOT / "experiments" / f"m0_{model_type}_2layer_pvonly_2021_2023_96to1")
+        args.save_dir = str(PROJECT_ROOT / "experiments" /
+                            f"m0_{model_type}_2layer_pvonly_2021_2023_{args.lookback_steps}to{args.prediction_horizon}")
     controller_class = {"lstm": PVLSTMController, "gru": PVGRUController}[model_type]
     return _variant_runner.main(args, controller_class)
 

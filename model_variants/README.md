@@ -1,3 +1,20 @@
+# 新增：1/2/3 天历史 → 未来 24 小时（96 步）
+
+六配置已准备，双层 LSTM/GRU 各对应 L=96/192/288、H=96，PV-only。
+用户在项目根目录激活 `external/ol-ems-hkust/.venv` 后，运行：
+
+```bash
+python -u tools/run_pv_multihorizon.py --dry-run
+python -u tools/run_pv_multihorizon.py --jobs 6
+```
+
+第二条才会开始训练；第一条只检查冻结文件和打印命令。新套件显式使用
+`--fc_hidden_size 64`，输出头为 64→64→96；训练结束自动汇总验证集，测试单独评估。
+完整说明见 [终端训练指南](../deliverables/PV双层模型_1至3天预测24小时_终端训练指南_2026-09-21.md)。
+新冻结数据为 `output/frozen/pv_only_2021_2023_multihorizon96_v1_20260921`。
+
+下文为保留的旧 96→1 使用说明；单独运行模型脚本而不指定新参数时仍使用旧默认值。
+
 # 双层 LSTM / GRU：96步历史 → 下一个15分钟
 
 M0正式入口 `external/ol-ems-hkust/main.py` 已直接接入本目录的双层网络，通过 `--model_type lstm`（默认）或 `--model_type gru` 选择。任务固定为 **96个15分钟历史PV点 → 紧接着的1个15分钟PV点**。本目录两个独立脚本仍可运行，和正式入口使用同一模型类、加载器及训练/评估实现。

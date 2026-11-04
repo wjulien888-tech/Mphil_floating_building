@@ -1,4 +1,4 @@
-"""Frozen 2021--2023 constructed PV, 96 historical PV points to one target.
+"""Frozen 2021--2023 constructed PV with configurable history and output windows.
 
 This forecast-only loader reads no demand, tariff or weather columns. Missing
 timestamps remain on the source axis; quality flags reject complete windows.
@@ -32,6 +32,7 @@ class PVForecastConfig:
     dt_hours: float = 0.25
     lookback_steps: int = 96
     prediction_horizon: int = 1
+    anchor_lookback_steps: int = 96
     require_quality_flags: bool = True
     pv_input_provenance: str = (
         "Constructed floating-building PV: each year's PVGIS building baseline "
@@ -64,8 +65,14 @@ class _PreparedPV:
 
 
 def _prepare(config: PVForecastConfig) -> _PreparedPV:
-    if (config.lookback_steps, config.prediction_horizon) != (96, 1):
-        raise ValueError("PV-only variants require exactly 96 history steps and 1 target")
+    for name in ("lookback_steps", "prediction_horizon", "anchor_lookback_steps"):
+        value = getattr(config, name)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise ValueError(f"{name} must be a positive integer")
+    # A shared history guard makes comparisons use identical forecast origins.
+    # Retain at least one day for the previous-day persistence baseline.
+    history_guard = max(96, config.lookback_steps, config.anchor_lookback_steps)
+    horizon = config.prediction_horizon
     if tuple(config.history_features) != ("pv",) or config.target_feature != "pv":
         raise ValueError("PV-only variants require history_features=['pv'] and target_feature='pv'")
     if pd.Timedelta(config.frequency) != pd.Timedelta(minutes=15) or config.dt_hours != 0.25:
@@ -87,8 +94,8 @@ def _prepare(config: PVForecastConfig) -> _PreparedPV:
         raise ValueError(f"PV-only CSV is missing columns: {sorted(missing)}")
     frame = source[required].rename(columns={config.timestamp_column: "datetime", pv_column: "pv"}).copy()
     timestamps = pd.DatetimeIndex(pd.to_datetime(frame["datetime"], errors="raise"))
-    if len(timestamps) <= 96 or timestamps.hasnans or timestamps.tz is not None:
-        raise ValueError("PV-only timestamps must be local naive and contain more than 96 rows")
+    if len(timestamps) < history_guard + horizon or timestamps.hasnans or timestamps.tz is not None:
+        raise ValueError("PV-only timestamps must be local naive and contain a complete history/target window")
     if not timestamps.is_monotonic_increasing or timestamps.has_duplicates:
         raise ValueError("PV-only timestamps must be ordered and unique")
     if not np.all(np.diff(timestamps.asi8) == pd.Timedelta(minutes=15).value):
@@ -119,16 +126,21 @@ def _prepare(config: PVForecastConfig) -> _PreparedPV:
     scale = torch.where(maximum > minimum, maximum - minimum, torch.ones_like(minimum))
     normalised = (raw - minimum) / scale
     history_bad = np.r_[0, np.cumsum(~frame["history_valid"].to_numpy())]
-    target_valid = frame["pv_target_valid"].to_numpy()
-    candidates = np.arange(96, len(frame), dtype=np.int64)
-    valid_window = (history_bad[candidates] == history_bad[candidates - 96]) & target_valid[candidates]
-    anchors, before = {}, {}
+    target_bad = np.r_[0, np.cumsum(~frame["pv_target_valid"].to_numpy())]
+    candidates = np.arange(history_guard, len(frame) - horizon + 1, dtype=np.int64)
+    valid_window = (
+        (history_bad[candidates] == history_bad[candidates - history_guard])
+        & (target_bad[candidates + horizon] == target_bad[candidates])
+    )
+    anchors, before, boundary_rejections = {}, {}, {}
     for name in config.split_windows:
-        in_split = expected_split[candidates] == name
+        starts_in_split = expected_split[candidates] == name
+        in_split = starts_in_split & (expected_split[candidates + horizon - 1] == name)
+        boundary_rejections[name] = int((starts_in_split & ~in_split).sum())
         before[name] = int(in_split.sum())
         anchors[name] = candidates[in_split & valid_window]
         if not len(anchors[name]):
-            raise ValueError(f"No valid complete 96-to-1 PV samples in {name}")
+            raise ValueError(f"No valid complete {config.lookback_steps}-to-{horizon} PV samples in {name}")
     return _PreparedPV(
         frame, raw, normalised, minimum, maximum,
         torch.from_numpy((timestamps.asi8 // 1_000_000_000).astype(np.int64, copy=True)),
@@ -138,7 +150,12 @@ def _prepare(config: PVForecastConfig) -> _PreparedPV:
             "scaler_valid_training_rows": int(train_mask.sum()),
             "samples_before_quality_filter": before,
             "samples_rejected_by_quality": {name: before[name] - len(anchors[name]) for name in anchors},
-            "sample_policy": "all 96 previous history_valid rows AND one pv_target_valid target; target belongs to split",
+            "samples_rejected_by_split_boundary": boundary_rejections,
+            "anchor_lookback_steps": history_guard,
+            "sample_policy": (
+                f"all {history_guard} previous history_valid rows AND all {horizon} "
+                "pv_target_valid targets; the complete target window belongs to one split"
+            ),
             "scaler_fit_quality_policy": "split=train AND history_valid",
         },
     )
@@ -157,8 +174,8 @@ class PVOnlyDataset(Dataset):
         self._anchors = self._prepared.anchors[split]
         self.input_features = ["pv"]
         self.output_features = ["pv"]
-        self.lookback_window = 96
-        self.prediction_horizon = 1
+        self.lookback_window = self.config.lookback_steps
+        self.prediction_horizon = self.config.prediction_horizon
         self.scaling_factors_min = self._prepared.minimum.clone()
         self.scaling_factors_max = self._prepared.maximum.clone()
 
@@ -217,11 +234,14 @@ class PVOnlyDataset(Dataset):
     def validation_summary(self) -> dict[str, Any]:
         frame = self._prepared.frame
         return {
-            "data_path": str(self.config.data_path), "artifact_type": "pv_only_forecast_96to1",
+            "data_path": str(self.config.data_path),
+            "artifact_type": ("pv_only_forecast_96to1" if (self.lookback_window, self.prediction_horizon) == (96, 1)
+                              else "pv_only_forecast_multistep"),
             "source_columns": dict(self.config.source_columns), "source_rows": len(frame),
             "source_start": frame.datetime.iloc[0].isoformat(), "source_end": frame.datetime.iloc[-1].isoformat(),
             "frequency": self.config.frequency, "timezone": self.config.timezone,
-            "lookback_steps": 96, "prediction_horizon": 1,
+            "lookback_steps": self.lookback_window, "prediction_horizon": self.prediction_horizon,
+            "anchor_lookback_steps": self.config.anchor_lookback_steps,
             "history_features": ["pv"], "target_features": ["pv"],
             "split_samples": {name: len(anchors) for name, anchors in self._prepared.anchors.items()},
             "split_dates": self.config.split_dates(),
@@ -235,13 +255,15 @@ class PVOnlyDataset(Dataset):
 
     def forecast_item(self, index: int) -> dict[str, torch.Tensor]:
         anchor = int(self._anchors[index])
+        stop = anchor + self.prediction_horizon
+        previous_day_indices = anchor - 96 + torch.arange(self.prediction_horizon) % 96
         return {
-            "history": self._prepared.normalised[anchor - 96:anchor].clone(),
-            "pv_target": self._prepared.raw[anchor:anchor + 1].clone(),
+            "history": self._prepared.normalised[anchor - self.lookback_window:anchor].clone(),
+            "pv_target": self._prepared.raw[anchor:stop].clone(),
             "timestamp": self._prepared.unix_seconds[anchor].clone(),
-            "future_timestamps": self._prepared.unix_seconds[anchor:anchor + 1].clone(),
-            "persistence": self._prepared.raw[anchor - 96:anchor - 95].clone(),
-            "persistence_last": self._prepared.raw[anchor - 1:anchor].clone(),
+            "future_timestamps": self._prepared.unix_seconds[anchor:stop].clone(),
+            "persistence": self._prepared.raw[previous_day_indices].clone(),
+            "persistence_last": self._prepared.raw[anchor - 1:anchor].repeat(self.prediction_horizon, 1),
         }
 
     def __getitem__(self, index: int) -> dict[str, torch.Tensor]:

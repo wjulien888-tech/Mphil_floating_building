@@ -1,0 +1,18 @@
+{
+  "profile_id": "battery_50kw_320kwh_24h_v1",
+  "hardware": {
+    "battery_capacity_kWh": 320.0,
+    "battery_power_kW": 50.0
+  },
+  "design_basis": {
+    "purpose": "Economic operation and 24-hour CL1+CL2 backup research baseline",
+    "required_pre_outage_soc_fraction": 0.9,
+    "minimum_soc_fraction": 0.1,
+    "sizing_end_of_life_soh_fraction": 0.8,
+    "roundtrip_efficiency": 0.92,
+    "zero_pv_critical_energy_24h_training_max_kWh": 170.9167906355128,
+    "minimum_nominal_capacity_at_soh_0p8_kWh": 278.42667540530994,
+    "estimated_ac_available_at_soh_0p8_kWh": 196.43725919488903,
+    "note": "SOH is a sizing allowance only; current dispatch does not simulate aging. CL1+CL2 only, not all loads. Requires pre-outage SOC90%; low-SOC scenarios remain stress tests. Not a validated 24-hour closed-loop guarantee."
+  }
+}

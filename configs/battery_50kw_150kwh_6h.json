@@ -1,0 +1,17 @@
+{
+  "profile_id": "battery_50kw_150kwh_6h_v1",
+  "hardware": {
+    "battery_capacity_kWh": 150.0,
+    "battery_power_kW": 50.0
+  },
+  "design_basis": {
+    "purpose": "Economic operation and 6-hour CL1+CL2 backup research baseline",
+    "required_pre_outage_soc_fraction": 0.9,
+    "minimum_soc_fraction": 0.1,
+    "sizing_end_of_life_soh_fraction": 0.8,
+    "roundtrip_efficiency": 0.92,
+    "zero_pv_critical_energy_6h_training_max_kWh": 79.9822329958328,
+    "estimated_ac_available_at_soh_0p8_kWh": 92.07996524760422,
+    "note": "SOH is a sizing allowance only; the current dispatch model does not simulate aging. This is not a validated 6-hour MPC supply guarantee. Existing low-initial-SOC scenarios remain stress tests."
+  }
+}

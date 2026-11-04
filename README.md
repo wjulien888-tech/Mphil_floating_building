@@ -43,7 +43,7 @@
 现阶段路线保持简单清晰：
 
 1. 复现并稳固基准：`pv_generation.py` + `load_generation.py` + `pv_load_daily_compare.py`
-2. 光伏情景扩展：PVGIS 基准曲线 × 实测光伏扰动系数（若数据获批）
+2. 光伏情景扩展：PVGIS 基准曲线 × 实测光伏扰动系数
 3. 在统一时间轴上构建调度输入：`pv_kW`、`load_kW`
 4. 实施调度策略：RBC → MILP → MPC
 5. 进行极端天气与离岛韧性测试（12/24/48/72h 等窗口）
@@ -450,3 +450,5 @@ git push
 ## License
 
 MIT License
+
+Latest source snapshot and validation setup: [2026-11-04 update](SOURCE_UPDATE_20261104.md).

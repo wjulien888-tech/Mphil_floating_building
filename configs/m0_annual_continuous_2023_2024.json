@@ -1,0 +1,191 @@
+{
+  "protocol_version": "m0-scenarios-v2",
+  "start": "2023-03-01 00:00:00",
+  "days": 366,
+  "information_rule": "Forecasts use past scenario PV only. An accurate t0 and duration are announced 24h before outages (S5:12h); false warning cancels at t0. Beyond 24h reserve estimates repeat the predicted daily PV/load profile.",
+  "cases": [
+    {
+      "name": "S0_grid",
+      "group": "S0",
+      "event_hour": 4428.0,
+      "initial_soc": 0.5,
+      "rho": 1.0
+    },
+    {
+      "name": "S1_false_warning_24h",
+      "group": "S1",
+      "announced_hours": 24,
+      "warning_hours": 24,
+      "event_hour": 4428.0,
+      "initial_soc": 0.5,
+      "rho": 1.0
+    },
+    {
+      "name": "S2_outage_6h",
+      "group": "S2",
+      "outage_hours": 6,
+      "announced_hours": 6,
+      "warning_hours": 24,
+      "event_hour": 4428.0,
+      "initial_soc": 0.5,
+      "rho": 1.0
+    },
+    {
+      "name": "S2_outage_12h",
+      "group": "S2",
+      "outage_hours": 12,
+      "announced_hours": 12,
+      "warning_hours": 24,
+      "event_hour": 4428.0,
+      "initial_soc": 0.5,
+      "rho": 1.0
+    },
+    {
+      "name": "S2_outage_24h",
+      "group": "S2",
+      "outage_hours": 24,
+      "announced_hours": 24,
+      "warning_hours": 24,
+      "event_hour": 4428.0,
+      "initial_soc": 0.5,
+      "rho": 1.0
+    },
+    {
+      "name": "S3_outage_48h",
+      "group": "S3",
+      "outage_hours": 48,
+      "announced_hours": 48,
+      "warning_hours": 24,
+      "event_hour": 4428.0,
+      "initial_soc": 0.5,
+      "rho": 1.0
+    },
+    {
+      "name": "S3_outage_72h",
+      "group": "S3",
+      "outage_hours": 72,
+      "announced_hours": 72,
+      "warning_hours": 24,
+      "event_hour": 4428.0,
+      "initial_soc": 0.5,
+      "rho": 1.0
+    },
+    {
+      "name": "S3_outage_168h",
+      "group": "S3",
+      "outage_hours": 168,
+      "announced_hours": 168,
+      "warning_hours": 24,
+      "event_hour": 4428.0,
+      "initial_soc": 0.5,
+      "rho": 1.0
+    },
+    {
+      "name": "S4_observed_low_grid",
+      "group": "S4",
+      "pv_regime": "observed_low",
+      "selection_hours": 168,
+      "event_hour": 4428.0,
+      "initial_soc": 0.5,
+      "rho": 1.0
+    },
+    {
+      "name": "S4_observed_low_outage_6h",
+      "group": "S4",
+      "pv_regime": "observed_low",
+      "selection_hours": 6,
+      "outage_hours": 6,
+      "announced_hours": 6,
+      "warning_hours": 24,
+      "event_hour": 4428.0,
+      "initial_soc": 0.5,
+      "rho": 1.0
+    },
+    {
+      "name": "S4_observed_low_outage_12h",
+      "group": "S4",
+      "pv_regime": "observed_low",
+      "selection_hours": 12,
+      "outage_hours": 12,
+      "announced_hours": 12,
+      "warning_hours": 24,
+      "event_hour": 4428.0,
+      "initial_soc": 0.5,
+      "rho": 1.0
+    },
+    {
+      "name": "S4_observed_low_outage_24h",
+      "group": "S4",
+      "pv_regime": "observed_low",
+      "selection_hours": 24,
+      "outage_hours": 24,
+      "announced_hours": 24,
+      "warning_hours": 24,
+      "event_hour": 4428.0,
+      "initial_soc": 0.5,
+      "rho": 1.0
+    },
+    {
+      "name": "S4_observed_low_outage_48h",
+      "group": "S4",
+      "pv_regime": "observed_low",
+      "selection_hours": 48,
+      "outage_hours": 48,
+      "announced_hours": 48,
+      "warning_hours": 24,
+      "event_hour": 4428.0,
+      "initial_soc": 0.5,
+      "rho": 1.0
+    },
+    {
+      "name": "S4_observed_low_outage_72h",
+      "group": "S4",
+      "pv_regime": "observed_low",
+      "selection_hours": 72,
+      "outage_hours": 72,
+      "announced_hours": 72,
+      "warning_hours": 24,
+      "event_hour": 4428.0,
+      "initial_soc": 0.5,
+      "rho": 1.0
+    },
+    {
+      "name": "S4_observed_low_outage_168h",
+      "group": "S4",
+      "pv_regime": "observed_low",
+      "selection_hours": 168,
+      "outage_hours": 168,
+      "announced_hours": 168,
+      "warning_hours": 24,
+      "event_hour": 4428.0,
+      "initial_soc": 0.5,
+      "rho": 1.0
+    }
+  ],
+  "s5_grid": {
+    "initial_soc": [
+      0.2,
+      0.8
+    ],
+    "rho": [
+      0.5,
+      1.0
+    ],
+    "event_hour": [
+      4422.0,
+      4434.0
+    ],
+    "outage_hours": [
+      24,
+      168
+    ],
+    "warning_hours": 12,
+    "pv_regime": [
+      "original",
+      "observed_low"
+    ]
+  },
+  "event_selection": "Select minimum cumulative PV windows within full test year, fixed clocks, >=24h lead-in and recovery. Imputed simulation PV participates; record imputed-point counts. No future PV is supplied to controller.",
+  "annual_protocol": "47 continuous annual trajectories; SOC carried across months; shared model weights updated monthly using arrived original-valid PV only.",
+  "preset_event_reason": "September 1 is a fixed date at the start of the second half of the 12-month test. Chosen before test scores; shared start isolates duration/rho effects. Does not constitute four-season outage coverage."
+}

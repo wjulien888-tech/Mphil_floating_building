@@ -412,3 +412,375 @@
 ### 工作说明
 
 当前口径：**极端天气事件 = 能源中心 / 数据中心实测 PV 中的真实连续低出力片段**，再转为扰动系数并作用到浮式建筑 PVGIS 基准。
+
+## 2026-06-01 - HKUST Clear Water Bay PV + Wind 数据体检
+
+### 目标
+
+初步接入 `HKUST_clea_bay_PV+wind_data` 数据包，确认其文件结构、时间范围、采样间隔和缺失情况，为后续 PVGIS 校准、风电估算和调度输入表构建做准备。
+
+### 已完成内容
+
+- 新增 `inspect_hkust_data.py`
+- 扫描 `HKUST_clea_bay_PV+wind_data/Dataset/Time series dataset/` 下的 CSV/XLSX 时序文件
+- 统计每个文件的类别、列名、行数、起止时间、典型采样间隔和缺失单元格比例
+- 输出文件级清单 `output/hkust_data_inventory.csv`
+- 输出 Markdown 摘要 `output/hkust_data_summary.md`
+
+### 主要发现
+
+- 共检查 `125` 个时序文件，合计约 `19,015,875` 行。
+- 气象数据覆盖 `2021-01-01` 至 `2023-12-31`，典型采样间隔为 `1 min`。
+- PV 站点级数据主要为 `15 min`，逆变器级数据主要为 `5 min`，无优化器站点数据主要为 `60 min`。
+- 站点级 PV 数据中，`UG Hall4.csv`、`SQ567.csv`、`UG Hall7.csv`、`SQ1.csv` 等覆盖较长且缺失率较低，可优先作为 PVGIS 校准样本。
+
+### 修改的文件
+
+- `inspect_hkust_data.py`（新建）
+- `WORKLOG.md`
+
+### 生成的文件
+
+- `output/hkust_data_inventory.csv`
+- `output/hkust_data_summary.md`
+
+### 工作说明
+
+- 当前脚本只做数据体检，不修改原始数据。
+- 本机默认 `python3` 环境缺少 `pandas`，本次使用 Codex bundled Python 运行脚本。
+- 下一步建议基于低缺失率站点构建小时级实测 PV 扰动系数，并与现有 `output/pv_generation_8760.csv` 对齐。
+
+## 2026-06-01 - 15 分钟天气驱动分项负荷模型
+
+### 目标
+
+将负荷侧从小时级 `load_8760.csv` 扩展为 15 分钟级合成负荷，以便和 HKUST 实测 PV 站点数据及 15 分钟气象聚合数据对齐；避免仅将小时负荷复制为 4 段。
+
+### 已完成内容
+
+- 新增 `load_generation_15min.py`
+- 读取 HKUST 2023 年 1 分钟气象数据：温度、相对湿度、辐照、降雨
+- 聚合为完整 15 分钟时间轴，共 `35,040` 行
+- 构建分项负荷：`base_kW`、`plug_kW`、`lighting_kW`、`hvac_kW`、`aux_kW`
+- 使用工作日/周末/法定假日/补班日 schedule 生成 occupancy 与 operation 因子
+- HVAC 由空调季、占用时段、室外温度、湿度和辐照共同驱动
+- 各分项分别校准到设计年电量 `60,461 kWh`
+
+### 修改的文件
+
+- `load_generation_15min.py`（新建）
+- `WORKLOG.md`
+
+### 生成的文件
+
+- `output/hkust_weather_15min_2023.csv`
+- `output/load_15min_2023.csv`
+
+### 主要结果
+
+- 年总负荷：`60,461.0 kWh`
+- `base_kW`：`7,255.3 kWh`（12.0%）
+- `plug_kW`：`7,859.9 kWh`（13.0%）
+- `lighting_kW`：`6,046.1 kWh`（10.0%）
+- `hvac_kW`：`36,276.6 kWh`（60.0%）
+- `aux_kW`：`3,023.1 kWh`（5.0%）
+
+### 工作说明
+
+- 当前 15 分钟负荷为合成模型，不是本建筑实测负荷。
+- 模型依据为“分项负荷 + schedule + 天气驱动 + 年电量校准”，不是小时曲线插值。
+- 当前运行环境缺少 `matplotlib`，因此脚本跳过图表生成，但 CSV 输出和电量校准已验证通过。
+
+## 2026-06-01 - HKUST 实测 PV 15 分钟对齐
+
+### 目标
+
+将 HKUST 站点级实测 PV 数据接入 15 分钟时间轴，并与 `load_15min_2023.csv` 对齐，作为后续提取实测扰动系数的数据基础。
+
+### 已完成内容
+
+- 新增 `align_hkust_pv_15min.py`
+- 默认选择 `8` 个覆盖长、缺失率低的站点：`UG Hall4`、`SQ567`、`UG Hall7`、`SQ1`、`SQ4`、`SQ2`、`LSK North`、`SQ3`
+- 读取站点级 `power(W)`，转换为 `kW`，对齐到 2023 年完整 15 分钟时间轴
+- 对短缺测进行时间插值，并保留 `raw_missing_site_count` 作为数据质量标记
+- 输出 HKUST 实测 PV 聚合表
+- 输出直接合并实测 PV 与合成负荷的数据核查表
+- 删除此前生成的 `output/dispatch_input_15min_hkust_scaled_2023.csv`，避免误解为 HKUST 实测 PV 可直接缩放代表漂浮建筑光伏
+
+### 修改的文件
+
+- `align_hkust_pv_15min.py`（新建，并移除缩放 PV 情景逻辑）
+- `WORKLOG.md`
+
+### 生成的文件
+
+- `output/hkust_pv_measured_15min_2023.csv`
+- `output/dispatch_input_15min_2023.csv`
+
+### 主要结果
+
+- 实测 HKUST PV 聚合年发电量：`316,760.4 kWh`
+- 实测 HKUST PV 聚合峰值：`265.5 kW`
+- 至少一个站点原始值缺失的 15 分钟时段：`15`
+
+### 工作说明
+
+- `dispatch_input_15min_2023.csv` 中的 HKUST 实测 PV 是多个屋顶站点聚合值，规模大于漂浮建筑，主要用于数据核查和扰动形状来源。
+- HKUST 实测 PV 不用于决定漂浮建筑光伏装机容量或绝对发电量。
+- 后续正确路线是从 HKUST 实测 PV 提取扰动系数，再作用到原有漂浮建筑 PVGIS 发电曲线上。
+
+## 2026-06-01 - 15 分钟 PV 扰动系数叠加
+
+### 目标
+
+从 HKUST 实测 15 分钟 PV 数据中提取无量纲扰动系数，并叠加到漂浮建筑原有 PVGIS 光伏出力上，生成 15 分钟 PV 情景和调度输入。
+
+### 已完成内容
+
+- 新增 `build_pv_disturbance_15min.py`
+- 将原有小时级 `output/pv_generation_8760.csv` 转为本地时间 15 分钟 step-hold PVGIS 基准
+- 用 HKUST 实测 PV 构建每个 15 分钟时刻的 clear-like 高分位基线
+- 计算扰动系数 `disturbance_factor = measured / clear_like_baseline`
+- 对扰动系数进行限幅，当前上限为 `1.20`
+- 将扰动系数叠加到漂浮建筑 PVGIS 基准上
+- 同时输出两种 PV 情景：
+  - `raw`：真实扰动直接作用后的 PV，年发电量可低于 PVGIS
+  - `annual_preserved`：将扰动后 PV 归一化回原 PVGIS 年发电量，用于只研究短时波动影响
+
+### 修改的文件
+
+- `build_pv_disturbance_15min.py`（新建）
+- `WORKLOG.md`
+
+### 生成的文件
+
+- `output/pv_disturbance_15min_2023.csv`
+- `output/pv_floating_pvgis_disturbed_15min_2023.csv`
+- `output/dispatch_input_15min_disturbed_2023.csv`
+
+### 主要结果
+
+- PVGIS 基准年发电量：`110,888.0 kWh`
+- 原始扰动后年发电量：`75,367.0 kWh`
+- 年总量保持版年发电量：`110,888.0 kWh`
+- 年总量归一化系数：`1.4713`
+- 扰动系数均值：`0.805`
+- 扰动系数 `5% / 50% / 95%` 分位数：`0.104 / 1.000 / 1.000`
+- 原始扰动 PV 下净负荷范围：`-68.5` 至 `28.6 kW`
+- 年总量保持 PV 下净负荷范围：`-104.8` 至 `25.5 kW`
+
+### 工作说明
+
+- `raw` 情景更接近真实天气折减，可用于极端低出力/韧性压力测试。
+- `annual_preserved` 情景保持原 PVGIS 年发电量，可用于分析短时波动对调度的影响。
+- 后续极端天气事件应优先从 `pv_disturbance_15min_2023.csv` 中提取连续低扰动窗口，而不是再次缩放 HKUST 实测绝对 PV。
+
+## 2026-06-01 - 15 分钟 RBC 储能调度基线
+
+### 目标
+
+基于 `dispatch_input_15min_disturbed_2023.csv` 建立第一版 15 分钟规则控制（RBC）储能调度，用于评估扰动 PV 情景下的缺电、弃光和电池 SOC。
+
+### 已完成内容
+
+- 新增 `dispatch_rbc_15min.py`
+- 默认使用 `pv_floating_disturbed_raw_kW` 作为 PV 输入
+- 默认电池参数：`215 kWh` 容量、`50 kW` 功率、`92%` 往返效率、初始 SOC `50%`
+- 规则：
+  - PV 大于负荷时，优先给电池充电，剩余计为弃光
+  - PV 小于负荷时，优先电池放电，剩余计为缺电
+- 输出完整 15 分钟调度结果与年度汇总指标
+
+### 修改的文件
+
+- `dispatch_rbc_15min.py`（新建）
+- `plot_dispatch_rbc_15min.js`（新建，用于在无 matplotlib 环境下输出 SVG 图）
+- `WORKLOG.md`
+
+### 生成的文件
+
+- `output/dispatch_rbc_15min_raw_battery215_2023.csv`
+- `output/dispatch_rbc_15min_raw_battery215_summary.csv`
+- `plots/dispatch_rbc_15min_raw_battery215_soc.svg`
+- `plots/dispatch_rbc_15min_raw_battery215_worst_day.svg`
+- `plots/dispatch_rbc_15min_raw_battery215_monthly.svg`
+
+### 主要结果
+
+- 负荷年电量：`60,461.0 kWh`
+- raw 扰动 PV 年发电量：`75,367.0 kWh`
+- 缺电量：`11,132.4 kWh`（`18.41%`）
+- 弃光量：`24,631.3 kWh`（PV 的 `32.68%`）
+- PV 自发自用率：`67.32%`
+- 最低 SOC：`0.0 kWh`
+- 最长连续缺电时长：`95.50 h`
+
+### 工作说明
+
+- 当前结果是项目给定 `215 kWh / 50 kW / 0.92` 电池配置下的压力测试基线。
+- 后续调度实验应保持电池容量和功率不变，对比 RBC / MILP / MPC 在同一硬件约束下的运行表现。
+
+## 2026-06-18 - 下周汇报可视化进度补充
+
+### 目标
+
+为下周组会准备肉眼可见的阶段性进展：把原计划中的 E2 极端低 PV 事件做成可展示的表格和图，并整理固定设计电池下的 E3 RBC 基线结果。
+
+### 已完成内容
+
+- 新增 `extract_extreme_pv_events_15min.py`
+- 从 `dispatch_input_15min_disturbed_2023.csv` 中提取最低连续 `24 h`、`48 h`、`72 h`、`168 h` raw 扰动 PV 窗口
+- 输出下周汇报简报 `deliverables/next_week_progress_brief.md`
+
+### 生成的文件
+
+- `output/extreme_low_pv_events_15min.csv`
+- `output/extreme_low_pv_events_15min.md`
+- `plots/extreme_low_pv_events_15min.svg`
+- `deliverables/next_week_progress_brief.md`
+
+### 主要结果
+
+- 最低 `24 h` 低 PV 窗口：`2023-09-07 16:45` 至 `2023-09-08 16:30`，raw 扰动 PV `1.8 kWh`，同期负荷 `166.5 kWh`
+- 最低 `48 h` 低 PV 窗口：`2023-10-08 10:00` 至 `2023-10-10 09:45`，raw 扰动 PV `10.9 kWh`，同期负荷 `276.7 kWh`
+- 最低 `72 h` 低 PV 窗口：`2023-09-07 15:15` 至 `2023-09-10 15:00`，raw 扰动 PV `19.7 kWh`，同期负荷 `365.1 kWh`
+- 当前 `215 kWh / 50 kW` RBC 缺电量仍为 `11,132.4 kWh`，缺电率 `18.41%`
+
+### 工作说明
+
+- E2 现在有了可落地的实测扰动低 PV 事件窗口，不再只是研究计划文字。
+- E3 仍保持项目给定的 `215 kWh / 50 kW` 电池配置，不做容量优化或重新选型。
+- 当前结果说明在 raw 扰动 PV + 简单 RBC 下，既定设计电池仍存在明显缺电，后续应继续推进 MILP / MPC，并区分并网年度运行与离岛极端事件韧性。
+
+## 2026-06-24 - 固定设计电池的极端低 PV 事件 RBC 实验
+
+### 目标
+
+在不改变电池容量和功率的前提下，继续推进 E2 极端天气 / 离岛韧性实验：用固定设计电池 `215 kWh / 50 kW` 跑已提取的 `24 h`、`48 h`、`72 h`、`7 d` 低 PV 事件窗口。
+
+### 已完成内容
+
+- 新增 `rbc_extreme_events_fixed_battery_15min.py`
+- 沿用当前 RBC 规则和固定电池参数：`215 kWh` 容量、`50 kW` 功率、`0.92` 往返效率、初始 SOC `50%`
+- 对 `output/extreme_low_pv_events_15min.csv` 中四个低 PV 事件分别运行事件级 RBC
+- 输出每个事件的详细 15 分钟调度表
+- 输出事件级汇总表和 5 张汇报用 SVG 图
+
+### 生成的文件
+
+- `output/rbc_extreme_events_fixed_battery_summary.csv`
+- `output/rbc_extreme_events_fixed_battery_summary.md`
+- `output/rbc_extreme_event_24h_fixed_battery_15min.csv`
+- `output/rbc_extreme_event_48h_fixed_battery_15min.csv`
+- `output/rbc_extreme_event_72h_fixed_battery_15min.csv`
+- `output/rbc_extreme_event_7d_fixed_battery_15min.csv`
+- `plots/rbc_extreme_events_fixed_battery_summary.svg`
+- `plots/rbc_extreme_event_24h_fixed_battery_dispatch.svg`
+- `plots/rbc_extreme_event_48h_fixed_battery_dispatch.svg`
+- `plots/rbc_extreme_event_72h_fixed_battery_dispatch.svg`
+- `plots/rbc_extreme_event_7d_fixed_battery_dispatch.svg`
+
+### 主要结果
+
+- `24 h` 事件：PV `1.8 kWh`，负荷 `166.5 kWh`，缺电 `61.6 kWh`，缺电率 `37.0%`
+- `48 h` 事件：PV `10.9 kWh`，负荷 `276.7 kWh`，缺电 `162.7 kWh`，缺电率 `58.8%`
+- `72 h` 事件：PV `19.7 kWh`，负荷 `365.1 kWh`，缺电 `242.3 kWh`，缺电率 `66.4%`
+- `7 d` 事件：PV `124.1 kWh`，负荷 `521.5 kWh`，缺电 `295.5 kWh`，缺电率 `56.7%`
+- 四个事件中电池最低 SOC 均达到 `0.0 kWh`
+
+### 工作说明
+
+- 该实验保持电池硬件参数固定，不做容量 / 功率优化。
+- 结果说明：即使全年 PV 能量有盈余，连续低 PV 事件下固定设计电池仍会被打空，因此离岛韧性需要按事件窗口单独评估。
+- 下一步可在相同固定硬件和相同事件窗口下实现 MILP，对比 RBC 与理论最优调度差距。
+
+## 2026-06-24 - E4-b 全年并网 MILP 调度实验
+
+### 目标
+
+在固定设计电池 `215 kWh / 50 kW` 和 raw 扰动 PV 输入下，开展全年并网 MILP 调度实验，用于和已有 RBC 并网经济性结果对比。
+
+### 已完成内容
+
+- 新增 `milp_e4b_full_year_grid_fixed_battery.py`
+- 使用 `pv_floating_disturbed_raw_kW` 和 `load_kW`
+- 电池容量和功率固定，不做容量优化
+- 电池仅允许由 PV 充电，不允许电网充电
+- 加入同一时间步购电 / 售电互斥约束，避免不合理套利
+- 按月求解全年 12 个 MILP，并将 SOC 在月间传递
+- 目标函数为最小化净电网成本：购电成本 - 售电收益，并加入小的弃光和循环惩罚
+
+### 生成的文件
+
+- `output/milp_e4b_full_year_grid_dispatch_2023.csv`
+- `output/milp_e4b_full_year_grid_summary.csv`
+- `output/milp_e4b_full_year_grid_summary.md`
+- `output/milp_e4b_full_year_grid_monthly_summary.csv`
+- `plots/milp_e4b_progress.svg`
+- `plots/milp_e4b_full_year_soc.svg`
+- `plots/milp_e4b_monthly_import_export_cost.svg`
+- `plots/milp_e4b_rbc_vs_milp_grid_cost.svg`
+
+### 主要结果
+
+- 全年 12 个月均求解为 `Optimal`
+- 年购电量：`15,695.6 kWh`
+- 年售电量：`29,560.3 kWh`
+- 弃光量：`0.0 kWh`
+- 购电成本：`7,539.8 CNY`
+- 售电收益：`10,641.7 CNY`
+- 净电网成本：`-3,101.9 CNY`
+- 最低 SOC：`0.0 kWh`
+- 期末 SOC：`0.0 kWh`
+
+### 工作说明
+
+- 与已有 RBC 经济性口径相比，MILP 的净电网成本从约 `-3.0 CNY` 改善到 `-3,101.9 CNY`。
+- MILP 相比 RBC 增加了购电量和售电量，说明其利用分时电价与上网电价，在固定电池约束下进行经济调度。
+- 当前 E4-b 为按月求解、SOC 月间传递的全年 MILP 第一版；若后续需要更严格的理论上界，可再尝试一次性全年优化。
+# 2026-08-02 - 无设备清单条件下的 CL1/CL2/CL3 代理负荷分级
+
+## 目标
+
+在无法取得浮式建筑真实设备表、配电回路表和关键负荷构成的条件下，基于现有 15 分钟合成分项负荷建立透明、可替换的离岛运行优先级情景，避免把假设描述成建筑实测分级。
+
+## 已完成内容
+
+- 新增 `deliverables/load_classification_framework.md`，定义 `CL1 安全关键 / CL2 功能保障 / CL3 可中断`，并说明其不直接等同于国标一级、二级、三级供电负荷。
+- 新增 `deliverables/load_inventory_template.csv`，保留未来接入设备或回路资料的字段。
+- 新增 `build_tiered_load_scenarios.py`。
+- 将现有 `base / plug / lighting / HVAC / aux` 视为五组母回路，通过显式分配矩阵生成三套功能代理情景：
+  - `emergency`；
+  - `minimum_operation`；
+  - `extended_operation`。
+- 每套情景在每个 15 分钟步严格保持 `CL1 + CL2 + CL3 = load_kW`。
+
+## 生成的文件
+
+- `output/load_tier_allocation_matrix.csv`
+- `output/load_tiers_15min_2023.csv`
+- `output/load_tiers_15min_summary.csv`
+- `output/load_tiers_15min_summary.md`
+
+## 主要结果
+
+- `emergency`：CL1 `7.2%`，CL2 `17.4%`，CL1+CL2 峰值 `6.27 kW`。
+- `minimum_operation`：CL1 `10.1%`，CL2 `29.8%`，CL1+CL2 峰值 `13.71 kW`。
+- `extended_operation`：CL1 `13.4%`，CL2 `47.6%`，CL1+CL2 峰值 `25.61 kW`。
+- 三套情景的最大逐时负荷重构误差均约为 `7.1e-15 kW`。
+
+## 工作说明
+
+- 上述比例是研究情景，不是实测设备占比或竣工回路清单。
+- 中心情景 `CL1+CL2` 峰值与旧任务说明中的固定 `13 kW` 量级接近，只作为交叉检查，不作为其来源验证。
+- 后续可直接把三套时序接入离岛储能 sizing 和 survivability 分析；若未来得到真实设备资料，只需替换分配矩阵。
+
+# 2026-09-09 - 数据冻结与正式 M0 预测训练
+
+- 修复 PV 扰动基准的未来信息依赖，改为此前 31 天同时间槽基准，由 2022 年 12 月初始化；气象采用有界因果补值并保留观测和质量标记，长缺测影响的窗口排除。
+- 使用 2022 年拟合的固定负荷系数，加入显式日历电价，冻结 `output/frozen/hkust_m0_v1_20260909/`。35,040 行连续时间轴，有效 train/val/test 窗口为 21,695 / 4,311 / 5,377；标准化仅拟合训练期有效行。旧输出未覆盖。
+- 增加 `train`、`evaluate` 独立入口、严格验证最优 `best.pt`、可复现续训 `last.pt`、逐轮日志、数据哈希绑定及昨日同期基线。数据/训练/评估共 21 项行为测试通过；压缩预测明细可独立重算全部分组和预测步指标。
+- 正式 M0 使用相同单层 LSTM（hidden 32、历史 672 步、预测 96 步），seeds 42/43/44，最多 50 轮，patience 8，min_delta 0.01 kW²；分别于 20/24/18 轮早停，最佳轮次为 12/16/10。未根据测试集选 seed 或调参。
+- 实验目录 `experiments/m0_frozen_v1_20260909/` 保存协议、数据清单、源代码快照、环境、三份 best/last 和完整独立 val/test 评估。套件运行约 14 分钟，最终产物核验通过。
+- 测试集三种子平均 RMSE 7.1234 kW，昨日同期基线 8.3905 kW，下降 15.10%；MAE 为 4.3916 kW，高于基线 3.6022 kW，近零 PV 时段正偏明显，不能表述为全面优于基线。
+- 结果与使用方式见 `deliverables/M0正式训练结果_2026-09-09.md` 和 `deliverables/M0训练与独立评估使用说明.md`。标签仍是构造浮式 PV 场景；本轮不包含 M1/M2、正式 MPC 闭环或经济/韧性结论。

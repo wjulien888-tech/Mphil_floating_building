@@ -147,8 +147,8 @@ def evaluate_m0(controller: torch.nn.Module, dataset: Any, output_dir: Path,
                    "units": "MAE/RMSE/MBE in kW; MSE in kW^2; MBE = prediction minus truth.",
                    "r2": "1-SSE/SST within each reported group; null for constant or numerically indistinguishable targets; no horizon-wise averaging for overall R2.",
                    "daylight": f"Post-hoc reporting mask: actual target PV > {args.daylight_threshold_kw} kW. This is not a solar-elevation or weather feature and is never supplied to the model.",
-                   "persistence": "For target t, persistence_24h uses PV[t-96] (24 hours ago); persistence_last uses PV[t-1] (15 minutes ago). Both use only observations before t.",
-                   "task": "96 observed quarter-hour steps predict the next one quarter-hour PV target. Each origin contributes one forecast.",
+                   "persistence": "For each future target t, persistence_24h uses PV[t-96] (24 hours ago). persistence_last repeats the last PV observation before the first target across the complete horizon. Both use only observations available when the forecast is issued.",
+                   "task": f"{dataset.lookback_window} observed quarter-hour PV steps directly predict the next {horizon} quarter-hour PV targets. Each origin contributes {horizon} forecast/target pairs.",
                    "selection": "No weight updates, no checkpoint selection, no MPC, no forecast clipping or calibration on this split.",
                    "data": "Constructed floating-PV scenario; metrics do not establish measured floating-building forecast performance."}}
     json_write(output_dir / "evaluation_summary.json", summary)

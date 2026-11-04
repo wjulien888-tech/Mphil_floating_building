@@ -1,0 +1,145 @@
+{
+  "scope": "Functional smoke only: one training batch, one validation batch, then saved best checkpoint reloaded for two validation batches. No formal training or test-set evaluation.",
+  "pytest": "25 passed",
+  "run_root": "/Users/julia/Transfer/0000Mphil_floating_building/tmp/pvonly_training_smoke_96x0qifm",
+  "models": {
+    "lstm": {
+      "status": "passed",
+      "trainable_parameters": 50763,
+      "dataset": {
+        "data_path": "/Users/julia/Transfer/0000Mphil_floating_building/output/frozen/pv_only_2021_2023_96to1_v1_20260920/pv_timeseries.csv",
+        "artifact_type": "pv_only_forecast_96to1",
+        "source_columns": {
+          "pv": "pv_kW"
+        },
+        "source_rows": 105120,
+        "source_start": "2021-01-01T00:00:00",
+        "source_end": "2023-12-31T23:45:00",
+        "frequency": "15min",
+        "timezone": "Asia/Shanghai",
+        "lookback_steps": 96,
+        "prediction_horizon": 1,
+        "history_features": [
+          "pv"
+        ],
+        "target_features": [
+          "pv"
+        ],
+        "split_samples": {
+          "train": 75235,
+          "val": 5852,
+          "test": 5852
+        },
+        "split_dates": {
+          "train": [
+            "2021-07-01",
+            "2023-09-01"
+          ],
+          "val": [
+            "2023-09-01",
+            "2023-11-01"
+          ],
+          "test": [
+            "2023-11-01",
+            "2024-01-01"
+          ]
+        },
+        "scaler_fit_interval": [
+          "2021-07-01T00:00:00",
+          "2023-09-01T00:00:00"
+        ],
+        "pv_min_kw": 0.0,
+        "pv_max_kw": 80.19342803955078,
+        "quality": {
+          "invalid_history_rows": 18048,
+          "invalid_pv_target_rows": 18085,
+          "scaler_valid_training_rows": 75360,
+          "samples_before_quality_filter": {
+            "train": 76032,
+            "val": 5856,
+            "test": 5856
+          },
+          "samples_rejected_by_quality": {
+            "train": 797,
+            "val": 4,
+            "test": 4
+          },
+          "sample_policy": "all 96 previous history_valid rows AND one pv_target_valid target; target belongs to split",
+          "scaler_fit_quality_policy": "split=train AND history_valid"
+        },
+        "pv_input_provenance": "Constructed floating-building PV: each year's PVGIS building baseline times a causal disturbance derived from HKUST measured PV; not measured floating-building telemetry."
+      },
+      "training_directory": "/Users/julia/Transfer/0000Mphil_floating_building/tmp/pvonly_training_smoke_96x0qifm/lstm",
+      "reload_validation_directory": "/Users/julia/Transfer/0000Mphil_floating_building/tmp/pvonly_training_smoke_96x0qifm/lstm_reload_val"
+    },
+    "gru": {
+      "status": "passed",
+      "trainable_parameters": 38155,
+      "dataset": {
+        "data_path": "/Users/julia/Transfer/0000Mphil_floating_building/output/frozen/pv_only_2021_2023_96to1_v1_20260920/pv_timeseries.csv",
+        "artifact_type": "pv_only_forecast_96to1",
+        "source_columns": {
+          "pv": "pv_kW"
+        },
+        "source_rows": 105120,
+        "source_start": "2021-01-01T00:00:00",
+        "source_end": "2023-12-31T23:45:00",
+        "frequency": "15min",
+        "timezone": "Asia/Shanghai",
+        "lookback_steps": 96,
+        "prediction_horizon": 1,
+        "history_features": [
+          "pv"
+        ],
+        "target_features": [
+          "pv"
+        ],
+        "split_samples": {
+          "train": 75235,
+          "val": 5852,
+          "test": 5852
+        },
+        "split_dates": {
+          "train": [
+            "2021-07-01",
+            "2023-09-01"
+          ],
+          "val": [
+            "2023-09-01",
+            "2023-11-01"
+          ],
+          "test": [
+            "2023-11-01",
+            "2024-01-01"
+          ]
+        },
+        "scaler_fit_interval": [
+          "2021-07-01T00:00:00",
+          "2023-09-01T00:00:00"
+        ],
+        "pv_min_kw": 0.0,
+        "pv_max_kw": 80.19342803955078,
+        "quality": {
+          "invalid_history_rows": 18048,
+          "invalid_pv_target_rows": 18085,
+          "scaler_valid_training_rows": 75360,
+          "samples_before_quality_filter": {
+            "train": 76032,
+            "val": 5856,
+            "test": 5856
+          },
+          "samples_rejected_by_quality": {
+            "train": 797,
+            "val": 4,
+            "test": 4
+          },
+          "sample_policy": "all 96 previous history_valid rows AND one pv_target_valid target; target belongs to split",
+          "scaler_fit_quality_policy": "split=train AND history_valid"
+        },
+        "pv_input_provenance": "Constructed floating-building PV: each year's PVGIS building baseline times a causal disturbance derived from HKUST measured PV; not measured floating-building telemetry."
+      },
+      "training_directory": "/Users/julia/Transfer/0000Mphil_floating_building/tmp/pvonly_training_smoke_96x0qifm/gru",
+      "reload_validation_directory": "/Users/julia/Transfer/0000Mphil_floating_building/tmp/pvonly_training_smoke_96x0qifm/gru_reload_val"
+    }
+  }
+}

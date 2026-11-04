@@ -42,6 +42,10 @@ class PymgridAdapter:
     resilience accounting.  ``loss_load_cost_per_kwh`` remains the pymgrid
     balancing-module fallback and the default for either omitted tier cost.
 
+    ``allow_grid_charging`` permits a scheduled battery charge to use grid
+    imports while connected. The adapter only executes/clips the MPC command;
+    it does not initiate charging based on prices or reserve targets.
+
     Notes
     -----
     ``pymgrid`` time-series modules consume energy per simulation step rather
@@ -76,6 +80,7 @@ class PymgridAdapter:
         soc_max: float = 0.9,
         grid_import_limit_kw: float = 4000.0,
         grid_export_limit_kw: float = 4000.0,
+        allow_grid_charging: bool = False,
         battery_cost_per_kwh: float = 0.0,
         loss_load_cost_per_kwh: float = 10.0,
         critical_loss_load_cost_per_kwh: float | None = None,
@@ -110,6 +115,7 @@ class PymgridAdapter:
         self.grid_export_limit_kw = self._nonnegative(
             "grid_export_limit_kw", grid_export_limit_kw
         )
+        self.allow_grid_charging = bool(allow_grid_charging)
         self.battery_cost_per_kwh = self._nonnegative(
             "battery_cost_per_kwh", battery_cost_per_kwh
         )
@@ -348,13 +354,13 @@ class PymgridAdapter:
             charge_supply_kw = max(0.0, pv_kw - load_kw)
             discharge_sink_kw = max(0.0, load_kw - pv_kw)
         else:
-            # Match the project baseline: charging must remain attributable to
-            # actual PV, while the grid may serve the coincident load. It also
-            # must not worsen load shedding when the interconnection is tight.
-            charge_supply_kw = min(
-                pv_kw,
-                max(0.0, pv_kw + effective_import_limit_kw - load_kw),
+            # Grid charging can use available import capacity after serving
+            # the admitted load. Never create energy or worsen load shedding.
+            charge_supply_kw = max(
+                0.0, pv_kw + effective_import_limit_kw - load_kw
             )
+            if not self.allow_grid_charging:
+                charge_supply_kw = min(pv_kw, charge_supply_kw)
             discharge_sink_kw = load_kw + effective_export_limit_kw
 
         charge_limit_kw = min(charge_limit_kw, charge_supply_kw)

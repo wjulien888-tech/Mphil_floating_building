@@ -156,3 +156,16 @@ def test_manifest_rejects_output_tampering(tmp_path):
     dispatch.write_text("pv\n9\n")
     with pytest.raises(ValueError, match="Frozen output differs from manifest: dispatch.csv"):
         entrypoint._dataset_identity(settings)
+
+
+def test_monthly_update_keeps_incoming_model_when_all_candidates_are_worse(tmp_path, monkeypatch):
+    import src.training_and_evaluation.m0_training as module
+    # Initial validation 1.0, followed by two strictly worse trained candidates.
+    losses = iter([1., 8., 2., 7., 1.5])
+    monkeypatch.setattr(module, '_epoch', lambda *a, **kw: (next(losses), 11))
+    saved = run(tmp_path, args(max_epochs=2, warm_start_baseline=True))
+    selected = load_checkpoint(tmp_path/'best.pt')
+    assert selected['epoch'] == saved['best_epoch'] == 0
+    assert selected['val_loss_mse'] == 1.
+    assert saved['epoch'] == 2
+    assert saved['training_signature']['warm_start_baseline'] is True
