@@ -1,454 +1,122 @@
-# MPhil Floating Building — 水上零碳建筑光伏 / 负荷 / 能量对比分析
+# MPhil Floating Building — 光伏预测与储能滚动调度
 
-> HKUST(GZ) Waterfront Living Lab 浮体零碳建筑 MPhil 研究项目。  
->
-> 本仓库当前主线为：先用 **PVGIS 光伏出力来源 + 设计院口径负荷来源** 建立 2023 年 8760 小时基准；若后续拿到能源中心 / 数据中心实测光伏数据，则用其提取南沙本地扰动系数，合成更贴近本地波动的光伏情景；最终开展 **储能调度（RBC / MILP / MPC）** 与 **极端天气离岛韧性**研究。
+面向 HKUST(GZ) 浮式建筑能源系统，研究光伏预测如何影响储能与电网调度，并在并网、停电预警及低光伏场景下比较经济性和供电可靠性。
 
----
+**更新日期：2026-11-04。** 当前代码覆盖数据准备、PV-only 预测、M0 场景评估、M1/M2 决策导向训练，以及 RBC / MILP / MPC 基线。研究采用的构造数据和情景不等于浮式建筑现场运行记录；“零碳”是研究背景，当前代码不构成已实现碳中和的证据。
 
-## 目录
-
-- [0. 研究定位与路线](#0-研究定位与路线组会主线)
-- [1. 研究背景与目标](#1-研究背景与目标)
-- [2. 项目结构](#2-项目结构)
-- [3. 使用方法](#3-使用方法)
-- [4. 模块详解](#4-模块详解)
-  - [4.1 pv_generation.py](#41-pv_generationpy)
-  - [4.2 load_generation.py](#42-load_generationpy)
-  - [4.3 pv_load_daily_compare.py](#43-pv_load_daily_comparepy)
-- [5. 关键结果](#5-关键结果)
-- [6. 讨论：与设计院口径的差异](#6-讨论与设计院口径的差异)
-- [7. 当前模型局限与待改进](#7-当前模型局限与待改进)
-- [8. 开发进度](#8-开发进度)
-- [9. Git 与版本控制](#9-git-与版本控制)
-- [10. 参考](#10-参考)
-
----
-
-## 0. 研究定位与路线
-
-### 0.1 数据来源
-
-
-| 数据项        | 来源                                                            | 在本项目中的作用                                                              |
-| ---------- | ------------------------------------------------------------- | --------------------------------------------------------------------- |
-| **光伏出力数据** | `data/pvgis_*.csv`（PVGIS ERA5，广州南沙坐标） + 设计参数（面积、效率、温度修正、水面系数） | 由 `pv_generation.py` 生成 `output/pv_generation_8760.csv`               |
-| **实测光伏参照** | 若可申请到能源中心 / 数据中心的逐时或 15 min 光伏数据                              | 提取南沙本地扰动系数，用于生成 `pv_generation_8760_scenario_*.csv` 情景，不替代基准 PVGIS 数据 |
-| **负荷数据**   | 设计院年总量口径（60,461 kWh） + ASHRAE 日程 + 中国节假日/调休规则                 | 由 `load_generation.py` 生成 `output/load_8760.csv`（分项 + 总负荷）            |
-| **调度输入**   | 上述逐时 `pv_kW` 与 `load_kW`                                      | 用于后续 `dispatch.py`（RBC / MILP / MPC）与离岛场景分析                           |
-
-
-### 0.2 当前研究路线
-
-现阶段路线保持简单清晰：
-
-1. 复现并稳固基准：`pv_generation.py` + `load_generation.py` + `pv_load_daily_compare.py`
-2. 光伏情景扩展：PVGIS 基准曲线 × 实测光伏扰动系数
-3. 在统一时间轴上构建调度输入：`pv_kW`、`load_kW`
-4. 实施调度策略：RBC → MILP → MPC
-5. 进行极端天气与离岛韧性测试（12/24/48/72h 等窗口）
-
-详细步骤与实验矩阵见 **[research_plan.md](research_plan.md)**。组会逐页稿见 **[deliverables/group_meeting_slides.md](deliverables/group_meeting_slides.md)**。
-
-### 0.3 实验矩阵（摘要）
-
-
-| 编号  | 名称              | PV 输入                                   | 负荷              | 电网 / 离岛   | 目的               |
-| --- | --------------- | --------------------------------------- | --------------- | --------- | ---------------- |
-| E0  | Baseline        | PVGIS 物理模型输出 `pv_generation_8760.csv`   | `load_8760.csv` | 未调度       | 已完成；看年盈余与逐时缺口    |
-| E1  | LocalPVScenario | E0 × 实测光伏扰动系数（若数据获批）                    | 同 E0            | 未调度       | 生成更贴近本地波动的 PV 情景 |
-| E2  | ExtremeWeather  | 从能源中心 / 数据中心实测 PV 提取的连续低出力事件，并叠加到 E0/E1 | 同 E0            | 部分时段离岛    | 压力测试             |
-| E3  | RBC 调度          | E0 / E1 / E2                            | 同 E0            | 并网 + 可选离岛 | 工程可解释基线          |
-| E4  | MILP 调度         | E0 / E1 / E2                            | 同 E0            | 并网 + 可选离岛 | 理论最优参照           |
-| E5  | MPC 调度          | E0 / E1 / E2                            | 同 E0            | 并网 + 可选离岛 | 滚动、更接近运行         |
-
-
-极端天气不是整年情景，而是从能源中心 / 数据中心实测 PV 中提取真实低出力事件窗口：建议做最低 `24 h`、`48 h`、`72 h` 连续低 PV，必要时增加最低 `7 d` 连续低出力周。完整尺度、指标与实现顺序见 [research_plan.md](research_plan.md) 第 5 节。
-
----
-
-## 1. 研究背景与目标
-
-研究对象：**HKUST(GZ) Waterfront Living Lab** 浮体零碳建筑，主体由球形幕墙（约 290 m²）与外圈浮体平台（约 130 m²，含玻璃栏杆）组成，坐标位于广州南沙附近（22.896°N, 113.480°E）。
-
-浮体建筑与陆上建筑相比，能源系统有几个明显差异：
-
-1. **水面微气候**：水面反照率略高，且水体冷却可提升组件效率（`+α` & `+β`）。
-2. **多朝向 BIPV**：球体同一时刻面对不同方向，需按朝向分别积分。
-3. **孤岛潜力**：浮体脱离母岸时需自持运行，因此调度策略尤其重要。
-4. **设计院口径 vs 物理口径**：设计院给出的 “年发电 55,580 kWh / 年耗电 60,461 kWh / 能源自持率 91.93%” 通常带综合折减或反推，与纯物理公式不一致，需要说明和对齐。
-
-本仓库要回答的问题是：
-
-> 在 **2023 年** 的 PVGIS 辐照与**设计院口径负荷**下，在**未接入储能调度**的情况下，光伏与负荷在 **逐日 / 逐时** 上是否匹配？缺口主要出现在何时何处？
-
-在基准之上，本研究还将回答：**在给定光伏出力与负荷来源下，何种调度策略能在并网与离岛条件下降低购电、控制缺电并应对极端天气？**（实现见规划中的 `dispatch.py` 等。）
-
----
-
-## 2. 项目结构
-
-```
-g:\0000Mphil_floating_building\
-├── data/                                  PVGIS 原始辐照数据（2023）
-│   ├── pvgis_south_45.csv                 南向, 倾角 45°
-│   ├── pvgis_east_45.csv                  东向, 倾角 45°
-│   ├── pvgis_west_45.csv                  西向, 倾角 45°
-│   ├── pvgis_north_45.csv                 北向, 倾角 45°
-│   ├── pvgis_deck.csv                     水平面 (甲板)
-│   └── pvgis_top.csv                      水平面 (备份, 与 deck 相同, MD5 校验)
-├── output/                                逐时结果
-│   ├── pv_generation_8760.csv             datetime, pv_kW
-│   └── load_8760.csv                      datetime, base_kW, hvac_kW, aux_kW, load_kW
-├── plots/                                 可视化结果（共 11 张）
-│   ├── pv_daily_kwh.png                   PV 日能量折线
-│   ├── pv_monthly_kwh.png                 PV 月能量柱状
-│   ├── pv_daily_full_year_bar.png         PV 全年逐日柱（按月着色）
-│   ├── pv_daily_full_year_heatmap.png     PV 日历热力图
-│   ├── load_daily_kwh.png                 负荷日能量折线
-│   ├── load_monthly_kwh.png               负荷月能量（三分量堆叠）
-│   ├── load_daily_full_year_bar.png       负荷全年逐日柱
-│   ├── load_daily_full_year_heatmap.png   负荷日历热力图
-│   ├── load_typical_day_stack.png         冬/夏典型日三分项叠加
-│   ├── pv_load_daily_compare.png          全年逐日 PV vs 负荷（含缺口/盈余填色）
-│   └── pv_load_weekly_hourly_overlay.png  典型周小时级 PV vs 负荷叠加
-├── pv_generation.py                       光伏发电脚本
-├── load_generation.py                     分项负荷脚本
-├── pv_load_daily_compare.py               未调度供需对比脚本
-├── requirements.txt                       Python 依赖
-├── research_plan.md                       研究路线：数据来源、实验矩阵、调度与离岛
-├── data_request.md                        数据来源说明与实测光伏数据申请字段
-├── Cursor_workflow.md                     PDF 研究任务的中文版说明
-├── Cursor_workflow.pdf                    原始研究任务 PDF
-├── deliverables/
-│   └── group_meeting_slides.md            组会汇报逐页稿（8–10 页）
-├── WORKLOG.md                             中文工作日志（每次改动都会追加）
-└── path_convention_note.txt               路径约定备忘
-```
-
----
-
-## 3. 使用方法
-
-### 3.1 环境依赖
-
-`requirements.txt` 如下：
+## 当前研究主线
 
 ```text
-pandas>=2.0
-numpy>=1.24
-matplotlib>=3.7
-pulp>=2.7
-scipy>=1.10
-tqdm>=4.65
-holidays>=0.45
+PVGIS 基线 / 清水湾实测参照 + 负荷与电价情景
+  → 数据清洗、时间对齐、训练期归一化与冻结
+  → 光伏预测
+  → MPC 优化储能、电网与分级负荷分配
+  → 执行当前时段动作、更新 SOC、滚动至下一时段
+  → 分别评估预测误差、成本、缺电与求解器状态
 ```
 
-推荐在项目虚拟环境内安装：
+预测模型输出可用 PV，优化器决定其使用和弃电，以及电池充放电、电网交换和未供负荷。系统功率平衡与电池 SOC 动态分别建模。
 
-```powershell
-cd g:\0000Mphil_floating_building
-python -m venv .venv
-.\.venv\Scripts\activate
-pip install -r requirements.txt
+| 方法 | 训练或控制目标 | 代码入口 |
+|---|---|---|
+| M0 | 预测误差监督训练，接入场景调度评估 | `model_variants/`、`tools/run_m0_simulation.py`、`tools/run_m0_scenarios.py` |
+| M1 | 预测 MSE + 经 MPC 和执行层计算的经济成本；不含显式 ENS 惩罚 | `tools/train_m1.py` |
+| M2 | 可配置预测监督 + 经济成本 + 分级实际未供能量 ENS 惩罚 | `tools/train_m2.py` |
+| 工程控制基线 | 规则控制、固定电池 MILP 与滚动 MPC | `dispatch_rbc_15min.py`、`rbc_extreme_events_fixed_battery_15min.py`、`milp_e4*.py`、`mpc_e5*.py` |
+
+M1/M2 的可微训练与正式 MILP 评估需区分优化形式和求解器。已有训练入口与测试，不等于 M1/M2 已优于 M0；正式结论须使用一致的场景、硬件、初始 SOC、数据切分和执行规则比较。
+
+## 数据与场景
+
+- **PVGIS 与建筑物理基线**：`pv_generation.py` 保留多朝向 BIPV 发电计算；`load_generation.py` 保留按设计年电量校准的合成负荷。年总量匹配是构造约束，不能作为实测验证。
+- **15 分钟及多年准备**：`prepare_m0_data.py`、`prepare_pv_only_multiyear.py`、`prepare_pv_only_multihorizon.py` 和 `tools/prepare_annual_*.py` 提供相应数据流程。
+- **构造 PV 标签**：部分冻结数据由建筑 PVGIS 基线乘清水湾实测扰动得到，不是浮式建筑实测功率；跨地点组合须标注为合成情景。
+- **预测任务**：已有双层 LSTM/GRU 的 96→1 旧任务，以及 96/192/288 步历史→未来 96 步的多步配置；15 分钟间隔下分别对应 1/2/3 天历史与未来 24 小时。不同任务不得直接混比。
+- **情景配置**：S0–S5 的版本定义见 `configs/m0_s0_s5_v2.json` 与 `tools/m0_scenarios.py`；另有 S1–S4 和不同电池配置。配置名称不能替代对事件、容量和时序的检查。
+
+原始数据、冻结输入、训练权重和完整运行结果保留本地。新检出环境需要取得对应数据及 manifest，并检查脚本中的本机/HPC 路径。冻结数据的身份校验规则见 [模型说明](model_variants/README.md)。
+
+## 环境与快速检查
+
+早期年度能量分析使用根目录 `requirements.txt`。预测与 MPC 集成使用独立的兼容环境，建议 Python 3.11，遵循 [集成环境说明](external/ol-ems-hkust/ENVIRONMENT.md)：
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install "pip==23.3.2" "setuptools==59.5.0" "wheel==0.42.0"
+python -m pip install -r external/ol-ems-hkust/requirements.txt
+python -m pip install --no-build-isolation --no-deps -e external/python-microgrid-hkust
+python -m pytest tests -q
 ```
 
-> 若运行时出现 Windows 的 `页面文件太小` 报错，不是代码问题，是系统虚拟内存不足，需要在系统设置里把 pagefile 调到 16–32 GB 后重启。
+`pymgrid` 由仓库中的 `python-microgrid-hkust` 提供，勿替换成同名的其他 PyPI 包。求解器和许可证也须在本机配置。正式场景评估的 MILP 求解器可通过 `MPC_MILP_SOLVER=gurobi|highs|auto` 选择，以当前代码的默认值和可用性检查为准。
 
-### 3.2 复现实验的 3 步
+2026-11-04 本地全量验证：**263 项测试通过**，有 14 条依赖警告；HiGHS 回归测试显式选择对应求解器。测试通过表示这些检查通过，不代表新跑完年度实验或现场验证。
 
-```powershell
-python pv_generation.py          # 产出 output/pv_generation_8760.csv 与 plots/pv_*.png
-python load_generation.py        # 产出 output/load_8760.csv 与 plots/load_*.png
-python pv_load_daily_compare.py  # 产出 plots/pv_load_daily_compare.png 与 plots/pv_load_weekly_hourly_overlay.png
+## 运行入口
+
+先查看参数，再准备匹配的冻结输入、checkpoint 与配置：
+
+```bash
+python tools/run_m0_scenarios.py --help
+python tools/train_m1.py --help
+python tools/train_m2.py --help
 ```
 
-三个脚本**互相解耦**：光伏和负荷分别生成，只在对比脚本里合并。
+已有多步预测冻结输入时，可先检查训练命令：
 
----
+```bash
+python tools/run_pv_multihorizon.py --dry-run
+```
 
-## 4. 模块详解
+M1/M2 支持 `--mode preflight`、`smoke` 和 `train`。先通过输入预检及短步验证，再开展正式训练；预检也需要相应本地数据。输出分别写入 `experiments/M1/` 与 `experiments/M2/`，续训与阶段初始化规则以脚本参数为准。
 
-### 4.1 pv_generation.py
+早期年度能量分析仍可在输入齐备后运行：
 
-**作用**：读取 5 份 PVGIS CSV（4 个倾斜面 + 水平甲板），按分区 BIPV 面积/效率/温度修正计算逐时功率，叠加水面微气候修正后得到 `pv_kW`。
+```bash
+python pv_generation.py
+python load_generation.py
+python pv_load_daily_compare.py
+```
 
-**关键参数**（来源于项目 PDF）：
+该流程只分析未调度的 PV 与负荷匹配。年度净能量盈余不代表每小时供电充足，也不等于停电时具备对应续航能力。
 
-
-| 分区                  | 面积 (m²)          | 类型   | 效率   |
-| ------------------- | ---------------- | ---- | ---- |
-| 球体 - 4 朝向 - 不透明 HJT | 每朝向 62.5（合计 250） | HJT  | 0.21 |
-| 球体 - 4 朝向 - 透明 CdTe | 每朝向 10（合计 40）    | CdTe | 0.12 |
-| 外圈浮体甲板              | 67.6             | HJT  | 0.21 |
-| 玻璃栏杆                | 62.4             | CdTe | 0.12 |
-
-
-**等效装机容量 ≈ 79 kWp**（`250×0.21 + 40×0.12 + 67.6×0.21 + 62.4×0.12`）。
-
-**单表面计算公式**：
+## 项目结构
 
 ```text
-G_total     = Gb(i) + Gd(i) + Gr(i)                   # W/m^2
-temp_factor = 1 + (-0.004) * (T2m - 25)
-P_kW        = max(0, G_total * area * eff * temp_factor / 1000)
+Mphil_floating_building/
+├── model_variants/                 # PV 预测、数据加载、可微 MPC 与执行层
+├── tools/                          # 年度实验、场景评估、M1/M2、天气分析与 HPC 工具
+├── configs/                        # 电池、事件、年度与训练配置
+├── tests/                          # 时间边界、预测、训练、调度与求解回归测试
+├── external/
+│   ├── ol-ems-hkust/               # 项目维护的 EMS 集成副本
+│   ├── python-microgrid-hkust/     # 项目维护的 microgrid 副本
+│   └── forecast_baselines/        # DLinear/PatchTST 及来源、许可证
+├── prepare_*.py                    # 数据准备入口
+├── pv_generation.py               # 原始 BIPV 物理基线
+├── load_generation*.py             # 合成负荷
+├── milp_e4*.py / mpc_e5*.py        # 历史调度基线
+├── output/                        # 本地生成数据与冻结输入
+└── experiments/                   # 本地训练、评估与 checkpoint
 ```
 
-**水面微气候修正（对合成功率）**：
+只读上游检出与项目维护副本的职责见 [external/README.md](external/README.md)。本次提交包含必要源码、配置、测试与上游许可证；虚拟环境、报告、演示材料及批量生成结果留在本地。
 
-```text
-P_corrected = P * albedo_factor * cooling_factor
-albedo_factor  = 1.05
-cooling_factor = 1.012
-```
+## 结果解释与下一步
 
-**数据质量处理**：
+正式对比至少分别报告预测误差、经济成本、分级 ENS/供电情况、SOC 和求解器诊断。未来实际 PV 只能用于明确标注的 perfect-forecast 对照，不能混入可部署策略。
 
-- PVGIS CSV 跳过前 8 行元数据
-- 文件末尾的列说明行被 `to_datetime(errors="coerce")` 自动剔除
-- 校验各朝向 CSV 的 `datetime` 严格一致
-- 校验 `pvgis_top.csv` 与 `pvgis_deck.csv` 的 MD5：当前两者相同，因此**水平面辐照只计一次**，避免重复累加
+50 kW / 320 kWh 等配置文件属于实验设定，不能直接宣称已验证 24 小时关键负荷保障。早期约 79 kWp、60,461 kWh 年负荷等物理/设计口径结果也不能直接套用于后续不同电池和场景版本。当前主要工作是固定条件下比较 M0、M1、M2 与完美预测对照，完善闭环验证、梯度及求解器一致性检查。
 
-**输出**：
+## 文档与来源
 
-- `output/pv_generation_8760.csv` 两列 `datetime, pv_kW`
-- 4 张图：`pv_daily_kwh.png`、`pv_monthly_kwh.png`、`pv_daily_full_year_bar.png`、`pv_daily_full_year_heatmap.png`
+- [2026-11-04 源码更新及验证说明](SOURCE_UPDATE_20261104.md)
+- [预测模型、数据协议与多步入口](model_variants/README.md)
+- [集成环境说明](external/ol-ems-hkust/ENVIRONMENT.md)
+- [工作日志](WORKLOG.md)：历史记录，具体结果须结合对应运行配置和输出核验。
+- [早期研究计划](research_plan.md)、[数据申请说明](data_request.md)：保留早期背景和设计资料口径。
+- [预测模型上游来源与许可证](external/forecast_baselines/UPSTREAM.md)
+- [独立光伏预测仓库](https://github.com/wjulien888-tech/PV_prediction)
 
-**运行打印示例**：
-
-```text
-Annual PV generation (sum of hourly kW): 110,888.0 kWh
-Design estimate (PDF):                   55,580.0 kWh
-Difference vs design:                    55,308.0 kWh
-```
-
----
-
-### 4.2 load_generation.py
-
-**作用**：按**分项模型**生成与光伏时间戳**逐行对齐**的逐时负荷。
-
-**模型形式**：
-
-```text
-load_kW(t) = base_kW(t) + hvac_kW(t) + aux_kW(t)
-```
-
-**分项定义与校准目标**：
-
-
-| 分项        | 内容         | 年电量目标 | 季节性    | 形状              |
-| --------- | ---------- | ----- | ------ | --------------- |
-| `base_kW` | 照明、普通插座、机房 | 30 %  | 全年     | ASHRAE 工作日 / 周末 |
-| `hvac_kW` | 空调         | 60 %  | 4–10 月 | 日内白天为主 × 月度权重   |
-| `aux_kW`  | 水泵、室外照明等   | 10 %  | 全年     | 傍晚/夜间较重         |
-
-
-校准口径：全年合计 **60,461 kWh**（与设计院参考一致），HVAC 占比 **≈ 60%**（参考设计院“空调耗电近 60%”口径）。
-
-**HVAC 月度权重**（南沙口径，用户确认）：
-
-```text
-1, 2, 3, 11, 12    -> 0.00    # 不开空调
-4                  -> 0.30
-5                  -> 0.70
-6                  -> 0.95
-7, 8               -> 1.00
-9                  -> 0.85
-10                 -> 0.40
-```
-
-> PDF 原口径是 5–9 月开空调，若需切回，只改 `HVAC_MONTH_SHAPE` 即可。
-
-**节假日与调休**：
-
-- 使用 `holidays.country_holidays("CN", years=[2023])`
-- 额外维护 `OFFICIAL_REST_2023`（国务院 2023 年放假日期），取并集
-- 额外维护 `MAKEUP_WORKDAYS_2023`（国务院 2023 年调休补班日）
-- 判定顺序：**补班日 → 工作日形状**；否则**周末或节假日 → 周末形状**；否则 → 工作日形状
-
-**缩放逻辑**：
-
-对每条分项，先计算“未缩放的形状面积” `S`（按小时步长积分），再按目标电量整体乘一个系数：
-
-```text
-factor = target_annual_kWh / S
-scaled = shape * factor
-```
-
-这保证了分项年电量精确命中目标；但也意味着**总量的吻合是构造出来的**，不是验证出来的（见下文 §6、§7）。
-
-**输出**：
-
-- `output/load_8760.csv` 五列 `datetime, base_kW, hvac_kW, aux_kW, load_kW`
-- 5 张图：`load_daily_kwh.png`、`load_monthly_kwh.png`（三分量堆叠）、`load_daily_full_year_bar.png`、`load_daily_full_year_heatmap.png`、`load_typical_day_stack.png`（冬季 2023-01-18 + 夏季 2023-07-19 的分项叠加）
-
-**运行打印示例**：
-
-```text
-年总负荷:     60,461.0 kWh   (目标 60,461.0 kWh)
-  - 基础:    18,138.3 kWh (30.0 %, 目标 30 %)
-  - HVAC:    36,276.6 kWh (60.0 %, 目标 60 %)
-  - 附属:     6,046.1 kWh (10.0 %, 目标 10 %)
-```
-
----
-
-### 4.3 pv_load_daily_compare.py
-
-**作用**：在未接入储能与调度的情况下，把光伏与负荷做**日级**与**小时级**对比，揭示哪些时段匹配、哪些时段缺口。
-
-**生成的 2 张图**：
-
-1. `plots/pv_load_daily_compare.png`
-  - **上**：全年逐日 PV / 负荷曲线；两线之间用**绿色**填色表示盈余、**红色**填色表示缺口
-  - **下**：逐日净能量 `PV − Load` 柱状图（绿为正、红为负）
-2. `plots/pv_load_weekly_hourly_overlay.png`
-  - **默认窗口 2023-07-17 ~ 2023-07-23**（可改 `WEEK_START` / `WEEK_END`）
-  - 同图绘制逐时 `PV` 与 `Load`，再用绿 / 红填色按**每小时**展示盈余 / 缺口
-  - 这张图用于看清楚“日视图掩盖的夜间缺口”和“连续阴雨天的多日缺口”
-
-**终端输出示例**：
-
-```text
-Annual PV: 110,888.0 kWh | Annual load: 60,461.0 kWh | Net (PV-load): +50,427.0 kWh
-Days with PV > load: 312 | Days with PV < load: 53
-```
-
----
-
-## 5. 关键结果
-
-
-| 指标         | 数值              | 备注                         |
-| ---------- | --------------- | -------------------------- |
-| 等效装机容量     | **≈ 79 kWp**    | 四朝向 HJT + CdTe + 甲板 + 栏杆   |
-| 有效光伏面积     | **420 m²**      | 球面 290 + 甲板 67.6 + 栏杆 62.4 |
-| 年光伏发电      | **110,888 kWh** | 物理公式直接积分                   |
-| 年建筑负荷      | **60,461 kWh**  | 分项模型校准到设计院口径               |
-| 年净能量       | **+50,427 kWh** | 未调度、未扣储能损耗                 |
-| PV > 负荷的天数 | **312 天**       | 全年 365 天                   |
-| PV < 负荷的天数 | **53 天**        | 主要集中在 6–10 月的阴雨段           |
-| 设计院自持率口径   | **91.93 %**     | 不是本模型直接产物，见 §6             |
-
-
----
-
-## 6. 讨论：与设计院口径的差异
-
-### 6.1 光伏年发电量：物理模型 ≈ 2 × 设计院数
-
-- **物理模型**：110,888 kWh
-- **设计院**：55,580 kWh
-
-这是 ~2 倍差。可能原因（按可能性排序）：
-
-1. **设计院给的数是“自持供电量”或反推值**，不是光伏毛发电量：
-  - `60,461.1 × 91.93% = 55,581.9 kWh`，几乎等于 55,580，吻合度过高，难以偶然。
-2. **设计院在发电量里已经隐含了 ~0.5 的综合折减**（遮阴、BOS、逆变器、弃电等），但文档没明写。
-3. **面积口径不同**：设计院另有一页写“可布置光伏面积 640 m²”，和 PDF 里的 420 m² 明显是两套口径。
-
-结论：**当前物理口径结果更适合作为学术分析的基准**；55,580 这个数可作为“工程汇报口径”并列列出，但不应当作“真值”去反证模型。
-
-### 6.2 负荷年电量：硬校准到 60,461 kWh
-
-- 旧版 `load_generation.py` 用 “一个总基准功率 × 日程系数” 算出 168 MWh，与设计院差 ~3 倍，口径明显不对。
-- 现在的 `load_generation.py` 改为**分项模型**，并**各自缩放**到目标电量，结果精确命中 60,461 kWh，HVAC 占比 60%。
-- 需要记住：这个“吻合”是**构造出来的**，真正的验证需要实测账单。目前仅能说分项形状是**合理的工程假设**。
-
-### 6.3 日级绿 ≠ 小时级够
-
-`pv_load_daily_compare.png` 看起来 **312 天盈余**，似乎“覆盖得很好”。但 `pv_load_weekly_hourly_overlay.png` 显示：
-
-- 每个自然日夜间几乎都存在缺口（红色）：PV → 0，但 `base + aux` 仍在；
-- 连续阴雨日如果出现，会造成**跨日缺口**，靠日级净能量是看不出来的。
-
-这是后续调度（`dispatch.py`）真正要处理的问题，也是为什么项目不能只到 §5 就结束。
-
----
-
-## 7. 当前模型局限与待改进
-
-
-| 局限                                      | 说明                                             |
-| --------------------------------------- | ---------------------------------------------- |
-| 负荷曲线过于规整                                | 工作日 / 周末各自是严格方波，没有随机性、没有会议 / 活动 / 设备轮换扰动       |
-| HVAC 月度权重是**阶梯**切换                      | 4 月 0.30 → 5 月 0.70 是阶跃，不随室外温度连续过渡             |
-| 年总量吻合是**构造**的                           | 缩放系数保证命中，不是独立校验                                |
-| 光伏温度修正只用 `T2m`                          | 未使用组件温度模型（NOCT/Wind 修正）                        |
-| 水面微气候用单一常数                              | 反照率 1.05 / 冷却 1.012 是中值；实际随季节变化                |
-| `pvgis_top.csv` 与 `pvgis_deck.csv` 当前相同 | 若日后补充真实 “顶面” 辐照，需要在 `pv_generation.py` 中新增顶面分区 |
-
-
----
-
-## 8. 开发进度
-
-- PVGIS 数据解析与预处理（含末尾脚注行与朝向一致性校验）
-- 多朝向 BIPV 发电量计算（面积 / 效率 / 温度 / 微气候）
-- 分项建筑负荷建模（base / HVAC / aux）
-- 设计院口径校准（60,461 kWh；60/30/10）
-- 节假日与调休处理（`holidays` + 国务院官方表）
-- 未调度 PV-负荷对比（日级 + 小时级周叠加）
-- 工作日志机制（`WORKLOG.md`）
-- 研究路线文档（`research_plan.md`）、数据申请说明（`data_request.md`）、组会逐页稿（`deliverables/group_meeting_slides.md`）
-- 储能系统规则控制调度（`dispatch.py` - RBC）
-- 储能系统 MILP 最优调度（`dispatch.py` - MILP）
-- 储能系统 MPC 滚动调度（`dispatch.py` - MPC）
-- 孤岛情景与续航时长分析
-- 水面微气候灵敏度分析（`sensitivity.py`）
-- 经济性评估（LCOE / 回收期）
-
----
-
-## 9. Git 与版本控制
-
-本项目用普通 Git 流程管理，推送到 GitHub 做备份。
-
-推荐的 `.gitignore`（最小实用）：
-
-```gitignore
-__pycache__/
-*.pyc
-.venv/
-venv/
-.vscode/
-.DS_Store
-Thumbs.db
-```
-
-日常流程：
-
-```powershell
-git add .
-git commit -m "说明这次改了什么"
-git push
-```
-
-每次有实质性改动，**同时**更新 `WORKLOG.md` 里的对应条目；提交信息写一句话摘要即可，细节放日志里。
-
----
-
-## 10. 参考
-
-- **研究路线与实验矩阵**：[research_plan.md](research_plan.md)
-- **数据来源说明**：[data_request.md](data_request.md)
-- **组会汇报稿**：[deliverables/group_meeting_slides.md](deliverables/group_meeting_slides.md)
-- **PDF 任务书**：`Cursor_workflow.pdf`（中文整理版 `Cursor_workflow.md`）
-- **气象数据**：[PVGIS - JRC European Commission](https://joint-research-centre.ec.europa.eu/pvgis-photovoltaic-geographical-information-system_en)
-- **负荷日程系数**：ASHRAE 90.1 Energy Standard（PDF 中给出具体数值）
-- **节假日**：
-  - `holidays` Python 包
-  - 国务院办公厅《关于 2023 年部分节假日安排的通知》
-- **设计院资料**：
-  - 《能源自持方面总结》（年用电 60,461.1 kWh、自持率 91.93%）
-  - 《浮体光伏分布分析》（有效发电面积 420 m²）
-  - 《能源自持（太阳能发电 + 风力发电）》（日用电 390.7 kWh、空调占比近 60%、负荷计算书）
-
----
-
-## License
-
-MIT License
-
-Latest source snapshot and validation setup: [2026-11-04 update](SOURCE_UPDATE_20261104.md).
+外部代码和数据遵循各自许可，使用前核对对应来源文件。
